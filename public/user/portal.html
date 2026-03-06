@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://cdn.discordapp.com https:; connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>codex2api · 用户仪表板</title>
+  <link rel="icon" href="/user/assets/favicon.webp" type="image/webp">
+  <link rel="icon" href="/user/assets/favicon.jpg" type="image/jpeg">
+  <link rel="stylesheet" href="/style.css">
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('codex2api_theme');
+        if (saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <style>
+    :root {
+      --bg-primary: var(--color-bg);
+      --bg-secondary: var(--color-bg-secondary);
+      --surface: var(--color-surface);
+      --surface-muted: var(--color-surface-hover);
+      --border: var(--color-border);
+      --text-primary: var(--color-text-primary);
+      --text-secondary: var(--color-text-secondary);
+      --text-muted: var(--color-text-muted);
+      --accent: var(--color-accent);
+      --accent-hover: var(--color-accent-hover);
+      --success: var(--color-success);
+      --danger: var(--color-danger);
+      --shadow: var(--shadow-lg);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      font-family: var(--font-family);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    .request-status-wrap {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+    }
+
+    .request-status-head {
+      max-width: 1160px;
+      margin: 0 auto 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .request-status-title {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+      letter-spacing: 0.02em;
+    }
+
+    .status-range-group {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .status-range-btn {
+      border: none;
+      border-right: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      line-height: 1;
+      padding: 5px 9px;
+      cursor: pointer;
+    }
+
+    .status-range-btn:last-child {
+      border-right: none;
+    }
+
+    .status-range-btn:hover {
+      background: var(--surface-muted);
+    }
+
+    .status-range-btn.active {
+      color: var(--text-primary);
+      background: var(--surface-muted);
+      font-weight: 600;
+    }
+
+    .request-status-strip {
+      height: 6px;
+      max-width: 1160px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(100, minmax(0, 1fr));
+      gap: 2px;
+    }
+
+    .status-segment {
+      border-radius: 2px;
+      background: var(--border);
+      display: block;
+      height: 100%;
+    }
+
+    .status-segment.success {
+      background: var(--success);
+    }
+
+    .status-segment.fail {
+      background: var(--danger);
+      box-shadow: 0 0 4px var(--color-danger-bg-hover);
+    }
+
+    .request-status-summary {
+      max-width: 1160px;
+      margin: 6px auto 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .page {
+      display: block;
+      width: min(1160px, calc(100% - 24px));
+      margin: 16px auto 22px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--bg-secondary);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .brand-name {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .brand-sub {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .user-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      color: var(--text-secondary);
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .user-name {
+      margin: 0;
+      font-size: 14px;
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-sub {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-primary);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--surface-muted);
+      border-color: var(--color-border-hover);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-danger {
+      border-color: var(--color-danger-border);
+      color: var(--danger);
+      background: var(--color-danger-bg);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: var(--color-danger-bg-hover);
+      border-color: var(--color-danger-border);
+    }
+
+    .btn-theme {
+      color: var(--text-secondary);
+    }
+
+    .grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-secondary);
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .stat-value {
+      margin: 8px 0 0;
+      font-size: 24px;
+      line-height: 1.2;
+      font-weight: 700;
+      word-break: break-all;
+    }
+
+    .stat-hint {
+      margin: 7px 0 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .panel {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--bg-secondary);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      padding: 14px;
+      flex-wrap: wrap;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .panel-sub {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .key-wrap {
+      padding: 14px;
+    }
+
+    .key-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .key-code {
+      margin: 0;
+      min-width: 280px;
+      max-width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+
+    .key-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .one-time {
+      margin-top: 10px;
+      border: 1px solid var(--color-success-border);
+      background: var(--color-success-bg);
+      border-radius: 10px;
+      padding: 10px;
+      display: none;
+    }
+
+    .one-time.show {
+      display: block;
+    }
+
+    .one-time p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--success);
+    }
+
+    .one-time code {
+      display: block;
+      margin-top: 8px;
+      word-break: break-all;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .hint-line {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      padding: 0 14px 14px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 740px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 10px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+      vertical-align: top;
+    }
+
+    .status-pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 12px;
+      border: 1px solid transparent;
+    }
+
+    .status-ok {
+      color: var(--success);
+      background: var(--color-success-bg);
+      border-color: var(--color-success-border);
+    }
+
+    .status-err {
+      color: var(--danger);
+      background: var(--color-danger-bg);
+      border-color: var(--color-danger-border);
+    }
+
+    .table-empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 16px 10px;
+    }
+
+    .foot {
+      margin-top: 12px;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg-secondary);
+      color: var(--text-muted);
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 80;
+      max-width: min(340px, calc(100vw - 20px));
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text-primary);
+      padding: 10px 12px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.2s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.ok {
+      border-color: var(--color-success-border);
+    }
+
+    .toast.error {
+      border-color: var(--color-danger-border);
+    }
+
+    .risk-body {
+      padding: 14px;
+    }
+
+    .risk-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .risk-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg-primary);
+      padding: 10px 12px;
+    }
+
+    .risk-label {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .risk-value {
+      margin: 6px 0 0;
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .risk-normal {
+      margin-top: 10px;
+      border: 1px solid var(--color-success-border);
+      border-radius: 10px;
+      background: var(--color-success-bg);
+      color: var(--success);
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .risk-warning {
+      margin-top: 10px;
+      border: 1px solid var(--color-danger-border);
+      border-radius: 10px;
+      background: var(--color-danger-bg);
+      padding: 10px 12px;
+    }
+
+    .risk-warning-text {
+      margin: 0;
+      color: var(--danger);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .risk-countdown {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .risk-reasons {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    .risk-reasons li {
+      margin: 4px 0;
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .risk-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        width: calc(100% - 14px);
+        margin-top: 10px;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .user-wrap {
+        width: 100%;
+      }
+
+      .user-name,
+      .user-sub {
+        max-width: 140px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .key-code {
+        min-width: 100%;
+      }
+
+      .request-status-wrap {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+
+      .request-status-head {
+        margin-bottom: 5px;
+      }
+
+      .request-status-title {
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="request-status-wrap" aria-label="全局最近 100 条请求状态条">
+    <div class="request-status-head">
+      <p class="request-status-title">全局请求状态</p>
+      <div id="statusRangeGroup" class="status-range-group" role="group" aria-label="状态时间范围">
+        <button class="status-range-btn active" type="button" data-hours="1">1h</button>
+        <button class="status-range-btn" type="button" data-hours="6">6h</button>
+        <button class="status-range-btn" type="button" data-hours="24">24h</button>
+      </div>
+    </div>
+    <div id="requestStatusStrip" class="request-status-strip" role="list"></div>
+    <div id="requestStatusSummary" class="request-status-summary" aria-live="polite">正在加载全局状态...</div>
+  </div>
+
+  <main class="page" aria-label="用户仪表板">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <div>
+          <p class="brand-name">codex2api · 用户仪表板</p>
+          <p class="brand-sub">最近请求状态已在顶部状态条显示</p>
+        </div>
+      </div>
+      <div class="user-wrap">
+        <div id="avatarBox" class="avatar" aria-hidden="true">?</div>
+        <div>
+          <p id="userName" class="user-name">加载中...</p>
+          <p id="userSub" class="user-sub">正在读取用户信息</p>
+        </div>
+        <button id="themeToggleBtn" class="btn btn-theme" type="button">浅色模式</button>
+        <button id="logoutBtn" class="btn btn-danger" type="button">登出</button>
+      </div>
+    </header>
+
+    <section class="panel" aria-label="风险状态">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">风险状态</h2>
+          <p id="riskMeta" class="panel-sub">正在评估风险状态...</p>
+        </div>
+      </div>
+      <div class="risk-body">
+        <div class="risk-grid">
+          <article class="risk-card">
+            <p class="risk-label">当前分数</p>
+            <p id="riskScore" class="risk-value">0</p>
+          </article>
+          <article class="risk-card">
+            <p class="risk-label">等级</p>
+            <p id="riskLevel" class="risk-value">低</p>
+          </article>
+          <article class="risk-card">
+            <p class="risk-label">当前状态</p>
+            <p id="riskAction" class="risk-value">正常</p>
+          </article>
+        </div>
+        <div id="riskNormalLine" class="risk-normal">状态正常</div>
+        <div id="riskWarningBox" class="risk-warning" hidden>
+          <p id="riskWarningText" class="risk-warning-text">当前状态触发风控，请关注命中规则。</p>
+          <p id="riskCountdown" class="risk-countdown" hidden></p>
+          <ul id="riskReasonList" class="risk-reasons"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid" aria-label="我的统计卡片">
+      <article class="stat-card">
+        <div class="stat-label">今日请求</div>
+        <p id="todayRequests" class="stat-value">-</p>
+        <p class="stat-hint">按当前自然日统计</p>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">今日 Token</div>
+        <p id="todayTokens" class="stat-value">-</p>
+        <p class="stat-hint">输入 + 输出 + 缓存 + 推理</p>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">累计请求</div>
+        <p id="totalRequests" class="stat-value">-</p>
+        <p class="stat-hint">账号维度累计</p>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">累计 Token</div>
+        <p id="totalTokens" class="stat-value">-</p>
+        <p class="stat-hint">历史总量</p>
+      </article>
+    </section>
+
+    <section class="panel" aria-label="API Key 管理">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">API Key 管理</h2>
+          <p class="panel-sub">Key 仅支持复制一次，再次获取请生成新 Key（旧 Key 会立即失效，请务必保存）。</p>
+        </div>
+      </div>
+      <div class="key-wrap">
+        <div class="key-row">
+          <pre id="maskedKey" class="key-code">dk-****...****</pre>
+          <div class="key-actions">
+            <button id="copyKeyBtn" class="btn" type="button">复制完整 Key</button>
+            <button id="rotateKeyBtn" class="btn" type="button">轮换 Key</button>
+          </div>
+        </div>
+        <div id="oneTimeKeyBox" class="one-time" role="status" aria-live="polite">
+          <p>新 Key 已生成，仅显示一次，请立即复制保存：</p>
+          <code id="oneTimeKeyText"></code>
+        </div>
+        <div id=”keyHint” class=”hint-line”>需要新 Key？点击「轮换 Key」生成（旧 Key 立即失效）。</div>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="调用记录表格">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">调用记录</h2>
+          <p id="historyMeta" class="panel-sub">加载中...</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>模型</th>
+              <th>输入 Token</th>
+              <th>输出 Token</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="5" class="table-empty">正在加载记录...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="foot">by Rok & Nan · 出于热爱与好奇而构建 ✨</div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      var state = {
+        profile: null,
+        fullApiKey: '',
+        historyRows: [],
+        toastTimer: null,
+        globalStatusRows: [],
+        globalLatestTs: 0,
+        statusHours: 1,
+        statusPollTimer: null,
+        riskPollTimer: null
+      };
+
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      function formatNumber(value) {
+        var n = Number(value || 0);
+        if (!isFinite(n)) n = 0;
+        return n.toLocaleString('zh-CN');
+      }
+
+      function formatCompactNumber(value) {
+        var n = Number(value || 0);
+        if (!isFinite(n)) n = 0;
+        var abs = Math.abs(n);
+        var unit = '';
+
+        if (abs >= 1000000) {
+          n = n / 1000000;
+          unit = 'M';
+        } else if (abs >= 1000) {
+          n = n / 1000;
+          unit = 'K';
+        } else {
+          return formatNumber(n);
+        }
+
+        var rounded = Math.round(n * 10) / 10;
+        var text = rounded.toFixed(1);
+        if (text.slice(-2) === '.0') text = text.slice(0, -2);
+        return text + unit;
+      }
+
+      function formatPercent(value) {
+        var n = Number(value || 0);
+        if (!isFinite(n)) n = 0;
+        var rounded = Math.round(n * 10) / 10;
+        var text = rounded.toFixed(1);
+        if (text.slice(-2) === '.0') text = text.slice(0, -2);
+        return text + '%';
+      }
+
+      function formatTime(ts) {
+        var raw = Number(ts || 0);
+        if (!isFinite(raw) || raw <= 0) return '-';
+        if (raw < 1000000000000) raw = raw * 1000;
+        var d = new Date(raw);
+        if (isNaN(d.getTime())) return '-';
+        return d.toLocaleString('zh-CN', { hour12: false });
+      }
+
+      function formatDuration(ms) {
+        var n = Math.floor(Number(ms || 0));
+        if (!isFinite(n) || n <= 0) return '0秒';
+        var totalSeconds = Math.floor(n / 1000);
+        var minutes = Math.floor(totalSeconds / 60);
+        var seconds = totalSeconds % 60;
+        if (minutes > 0) return minutes + '分' + seconds + '秒';
+        return seconds + '秒';
+      }
+
+      function mapRiskLevelLabel(level) {
+        var value = String(level || '').toLowerCase();
+        if (value === 'critical') return '危险';
+        if (value === 'high') return '高';
+        if (value === 'medium') return '中';
+        return '低';
+      }
+
+      function mapRiskActionLabel(action) {
+        var value = String(action || '').toLowerCase();
+        if (value === 'suspend') return '封禁';
+        if (value === 'challenge') return '挑战';
+        if (value === 'throttle') return '限速';
+        return '正常';
+      }
+
+      function showToast(message, kind) {
+        var toast = $('toast');
+        toast.textContent = message;
+        toast.classList.remove('ok', 'error', 'show');
+        if (kind) toast.classList.add(kind);
+        requestAnimationFrame(function () {
+          toast.classList.add('show');
+        });
+        if (state.toastTimer) clearTimeout(state.toastTimer);
+        state.toastTimer = setTimeout(function () {
+          toast.classList.remove('show');
+        }, 2600);
+      }
+
+      function buildAvatarUrl(user) {
+        var obj = user || {};
+        var userId = String(obj.discord_user_id || '').trim();
+        var avatar = String(obj.avatar || '').trim();
+        if (!avatar) return '';
+        if (/^https?:\/\//i.test(avatar)) return avatar;
+        if (!userId) return '';
+        var ext = avatar.indexOf('a_') === 0 ? 'gif' : 'png';
+        return 'https://cdn.discordapp.com/avatars/' + encodeURIComponent(userId) + '/' + encodeURIComponent(avatar) + '.' + ext + '?size=128';
+      }
+
+      function sumTokens(bucket) {
+        var data = bucket || {};
+        var total = Number(data.total_tokens || 0);
+        if (total > 0) return total;
+        return Number(data.input_tokens || 0)
+          + Number(data.output_tokens || 0)
+          + Number(data.cached_tokens || 0)
+          + Number(data.reasoning_tokens || 0);
+      }
+
+      function setText(id, value) {
+        $(id).textContent = value;
+      }
+
+      function syncThemeButtonLabel() {
+        var btn = $('themeToggleBtn');
+        if (!btn) return;
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        btn.textContent = isDark ? '深色模式' : '浅色模式';
+      }
+
+      function initThemeToggle() {
+        var btn = $('themeToggleBtn');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+          if (isDark) {
+            document.documentElement.removeAttribute('data-theme');
+            try { localStorage.setItem('codex2api_theme', 'light'); } catch (_) {}
+          } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            try { localStorage.setItem('codex2api_theme', 'dark'); } catch (_) {}
+          }
+          syncThemeButtonLabel();
+        });
+        syncThemeButtonLabel();
+      }
+
+      function renderUsage(usage) {
+        var data = usage || {};
+        var today = data.today || {};
+        var total = data.total || {};
+
+        setText('todayRequests', formatNumber(today.requests));
+        setText('todayTokens', formatNumber(sumTokens(today)));
+        setText('totalRequests', formatNumber(total.requests));
+        setText('totalTokens', formatNumber(sumTokens(total)));
+      }
+
+      function renderRiskStatus(payload) {
+        var data = payload || {};
+        var actions = data.actions || {};
+        var scoreValue = Number(data.score || 0);
+        if (!isFinite(scoreValue)) scoreValue = 0;
+        var score = Math.max(0, Math.min(100, Math.round(scoreValue)));
+        var level = String(data.level || 'low');
+        var appliedAction = String(actions.applied || 'observe');
+        var reasons = Array.isArray(data.reasons) ? data.reasons : [];
+        var remainingMs = Number(data.auto_decay_remaining_ms || 0);
+        if (!isFinite(remainingMs) || remainingMs < 0) remainingMs = 0;
+
+        setText('riskScore', String(score));
+        setText('riskLevel', mapRiskLevelLabel(level));
+        setText('riskAction', mapRiskActionLabel(appliedAction));
+        setText('riskMeta', '每15秒自动刷新');
+
+        var normalLine = $('riskNormalLine');
+        var warningBox = $('riskWarningBox');
+        var warningText = $('riskWarningText');
+        var countdown = $('riskCountdown');
+        var reasonList = $('riskReasonList');
+        reasonList.textContent = '';
+
+        if (appliedAction === 'observe') {
+          normalLine.hidden = false;
+          warningBox.hidden = true;
+          return;
+        }
+
+        normalLine.hidden = true;
+        warningBox.hidden = false;
+        warningText.textContent = '当前状态触发风控，请关注命中规则并尽快降低异常行为。';
+
+        if (remainingMs > 0) {
+          countdown.hidden = false;
+          countdown.textContent = '预计自动恢复剩余：' + formatDuration(remainingMs);
+        } else {
+          countdown.hidden = true;
+          countdown.textContent = '';
+        }
+
+        if (reasons.length === 0) {
+          var emptyItem = document.createElement('li');
+          emptyItem.textContent = '暂无命中规则详情';
+          reasonList.appendChild(emptyItem);
+          return;
+        }
+
+        for (var i = 0; i < reasons.length; i++) {
+          var row = reasons[i] || {};
+          var desc = String(row.description || row.rule_id || '未知规则');
+          var ruleScore = Number(row.score || 0);
+          if (!isFinite(ruleScore)) ruleScore = 0;
+          var text = desc + '（+' + formatNumber(ruleScore) + ' 分）';
+          if (row.value !== undefined && row.threshold !== undefined) {
+            text += '，当前值 ' + String(row.value) + ' / 阈值 ' + String(row.threshold);
+          }
+          var item = document.createElement('li');
+          item.textContent = text;
+          reasonList.appendChild(item);
+        }
+      }
+
+      function renderProfile() {
+        var data = state.profile || {};
+        var user = data.user || {};
+        var apiKey = data.api_key || {};
+
+        var displayName = String(user.global_name || user.username || '未命名用户');
+        var displaySub = user.username ? ('@' + user.username) : 'Discord 用户';
+        if (user.seq_id) {
+          displaySub += ' · 序号 ' + String(user.seq_id);
+        }
+        if (Array.isArray(user.roles) && user.roles.length > 0) {
+          displaySub += ' · 身份组 ' + user.roles.length + ' 个';
+        }
+
+        setText('userName', displayName);
+        setText('userSub', displaySub);
+
+        var avatarBox = $('avatarBox');
+        var avatarUrl = buildAvatarUrl(user);
+        if (avatarUrl) {
+          var img = document.createElement('img');
+          img.src = avatarUrl;
+          img.alt = '用户头像';
+          avatarBox.textContent = '';
+          avatarBox.appendChild(img);
+        } else {
+          avatarBox.textContent = (displayName.trim().charAt(0) || '?').toUpperCase();
+        }
+
+        var masked = String(apiKey.masked || '').trim();
+        setText('maskedKey', masked || '暂无 Key，请点击「轮换 Key」生成');
+
+        var full = String(apiKey.api_key || apiKey.full || apiKey.one_time_key || '').trim();
+        if (full) showOneTimeKey(full);
+
+        if (data.usage) renderUsage(data.usage);
+      }
+
+      function showOneTimeKey(fullKey) {
+        var value = String(fullKey || '').trim();
+        if (!value) return;
+        state.fullApiKey = value;
+        $('oneTimeKeyText').textContent = value;
+        $('oneTimeKeyBox').classList.add('show');
+      }
+
+      function getLatestStatusTs(rows) {
+        var latest = 0;
+        var list = Array.isArray(rows) ? rows : [];
+        for (var i = 0; i < list.length; i++) {
+          var ts = Number((list[i] || {}).ts || 0);
+          if (ts > latest) latest = ts;
+        }
+        return latest;
+      }
+
+      function normalizeGlobalStatusRows(rows) {
+        var list = Array.isArray(rows) ? rows.slice() : [];
+        var normalized = [];
+        for (var i = 0; i < list.length; i++) {
+          var row = list[i] || {};
+          normalized.push({
+            ts: Number(row.ts || 0),
+            status: Number(row.status || 0),
+            model: String(row.model || ''),
+            input_tokens: Number(row.input_tokens || 0),
+            output_tokens: Number(row.output_tokens || 0),
+            error: row.error ? String(row.error) : ''
+          });
+        }
+        normalized.sort(function (a, b) {
+          return a.ts - b.ts;
+        });
+        return normalized;
+      }
+
+      function setStatusRangeActive(hours) {
+        var group = $('statusRangeGroup');
+        if (!group) return;
+        var buttons = group.querySelectorAll('.status-range-btn');
+        for (var i = 0; i < buttons.length; i++) {
+          var btn = buttons[i];
+          var btnHours = Number(btn.getAttribute('data-hours') || 0);
+          btn.classList.toggle('active', btnHours === Number(hours || 1));
+        }
+      }
+
+      function renderStatusSummary(summary) {
+        var data = summary || {};
+        var text = '总请求 ' + formatCompactNumber(data.total_requests)
+          + ' | 成功率 ' + formatPercent(data.success_rate)
+          + ' | Token ' + formatCompactNumber(data.total_input_tokens) + ' 输入 / '
+          + formatCompactNumber(data.total_output_tokens) + ' 输出'
+          + ' | 近1h ' + formatCompactNumber(data.requests_1h) + '次'
+          + ' | 近24h ' + formatCompactNumber(data.requests_24h) + '次';
+        setText('requestStatusSummary', text);
+      }
+
+      function renderStatusStrip(rows) {
+        var strip = $('requestStatusStrip');
+        strip.textContent = '';
+
+        var list = Array.isArray(rows) ? rows.slice(-100) : [];
+        var blanks = Math.max(0, 100 - list.length);
+        for (var i = 0; i < 100; i++) {
+          var segment = document.createElement('span');
+          segment.className = 'status-segment';
+          segment.setAttribute('role', 'listitem');
+
+          var rowIndex = i - blanks;
+          var row = rowIndex >= 0 ? list[rowIndex] : null;
+          if (!row) {
+            segment.title = '无数据';
+            strip.appendChild(segment);
+            continue;
+          }
+
+          var code = Number(row.status || 0);
+          var ok = code >= 200 && code < 400;
+          segment.classList.add(ok ? 'success' : 'fail');
+
+          var titleLines = [];
+          titleLines.push('时间: ' + formatTime(row.ts));
+          titleLines.push('状态码: ' + (code || '-'));
+          titleLines.push('模型: ' + (row.model || '-'));
+          if (row.error) titleLines.push('错误: ' + row.error);
+          segment.title = titleLines.join('\n');
+          strip.appendChild(segment);
+        }
+      }
+
+      function renderHistoryRows(rows) {
+        var tbody = $('historyBody');
+        tbody.textContent = '';
+
+        if (!Array.isArray(rows) || rows.length === 0) {
+          var emptyRow = document.createElement('tr');
+          var emptyCell = document.createElement('td');
+          emptyCell.colSpan = 5;
+          emptyCell.className = 'table-empty';
+          emptyCell.textContent = '暂无调用记录';
+          emptyRow.appendChild(emptyCell);
+          tbody.appendChild(emptyRow);
+          return;
+        }
+
+        for (var i = 0; i < rows.length; i++) {
+          var item = rows[i] || {};
+          var tr = document.createElement('tr');
+
+          var tdTime = document.createElement('td');
+          tdTime.textContent = formatTime(item.ts);
+          tr.appendChild(tdTime);
+
+          var tdModel = document.createElement('td');
+          tdModel.textContent = item.model ? String(item.model) : '-';
+          tr.appendChild(tdModel);
+
+          var tdIn = document.createElement('td');
+          tdIn.textContent = formatNumber(item.input_tokens);
+          tr.appendChild(tdIn);
+
+          var tdOut = document.createElement('td');
+          tdOut.textContent = formatNumber(item.output_tokens);
+          tr.appendChild(tdOut);
+
+          var tdStatus = document.createElement('td');
+          var code = Number(item.status || 0);
+          var badge = document.createElement('span');
+          if (code >= 200 && code < 400) {
+            badge.className = 'status-pill status-ok';
+            badge.textContent = code ? ('成功 ' + code) : '成功';
+          } else {
+            badge.className = 'status-pill status-err';
+            badge.textContent = code ? ('失败 ' + code) : '失败';
+          }
+          tdStatus.appendChild(badge);
+          tr.appendChild(tdStatus);
+
+          tbody.appendChild(tr);
+        }
+      }
+
+      async function apiRequest(url, options) {
+        var init = Object.assign({
+          method: 'GET',
+          credentials: 'same-origin'
+        }, options || {});
+
+        if (init.body && typeof init.body === 'object' && !(init.body instanceof FormData)) {
+          init.headers = Object.assign({}, init.headers || {}, { 'Content-Type': 'application/json' });
+          init.body = JSON.stringify(init.body);
+        }
+
+        var resp = await fetch(url, init);
+        if (resp.status === 401) {
+          window.location.replace('/login');
+          throw new Error('unauthorized');
+        }
+        return resp;
+      }
+
+      async function loadProfile() {
+        var resp = await apiRequest('/user/api/profile');
+        var payload = await resp.json();
+        if (!resp.ok || !payload || payload.success !== true || !payload.data) {
+          throw new Error((payload && payload.error) ? payload.error : 'profile_load_failed');
+        }
+        state.profile = payload.data;
+        renderProfile();
+      }
+
+      async function loadUsage() {
+        var resp = await apiRequest('/user/api/usage');
+        var payload = await resp.json();
+        if (!resp.ok || !payload || payload.success !== true) {
+          throw new Error((payload && payload.error) ? payload.error : 'usage_load_failed');
+        }
+        renderUsage(payload.data || {});
+      }
+
+      async function loadRiskStatus() {
+        var resp = await apiRequest('/user/api/risk-status');
+        var payload = await resp.json();
+        if (!resp.ok || !payload || payload.success !== true || !payload.data) {
+          throw new Error((payload && payload.error) ? payload.error : 'risk_status_load_failed');
+        }
+        renderRiskStatus(payload.data || {});
+      }
+
+      async function loadGlobalStats(options) {
+        var opts = options || {};
+        var replaceAll = opts.replace === true;
+        var hours = Number(state.statusHours || 1);
+        var url = '/user/api/stats/global?hours=' + encodeURIComponent(hours);
+        var resp = await apiRequest(url);
+        var payload = await resp.json();
+        if (!resp.ok || !payload || payload.success !== true || !payload.data) {
+          throw new Error((payload && payload.error) ? payload.error : 'global_stats_load_failed');
+        }
+
+        var data = payload.data || {};
+        var incoming = normalizeGlobalStatusRows(data.recent || []);
+        if (replaceAll || state.globalStatusRows.length === 0) {
+          state.globalStatusRows = incoming.slice(-100);
+          state.globalLatestTs = getLatestStatusTs(state.globalStatusRows);
+        } else {
+          var latestTs = Number(state.globalLatestTs || 0);
+          for (var i = 0; i < incoming.length; i++) {
+            var row = incoming[i] || {};
+            if (Number(row.ts || 0) > latestTs) {
+              state.globalStatusRows.push(row);
+            }
+          }
+          if (state.globalStatusRows.length > 100) {
+            state.globalStatusRows = state.globalStatusRows.slice(-100);
+          }
+          state.globalLatestTs = getLatestStatusTs(state.globalStatusRows);
+        }
+
+        renderStatusStrip(state.globalStatusRows);
+        renderStatusSummary(data.summary || {});
+      }
+
+      function bindStatusRangeSelector() {
+        var group = $('statusRangeGroup');
+        if (!group) return;
+        var buttons = group.querySelectorAll('.status-range-btn');
+        for (var i = 0; i < buttons.length; i++) {
+          buttons[i].addEventListener('click', function () {
+            var nextHours = Number(this.getAttribute('data-hours') || 1);
+            if (nextHours === Number(state.statusHours || 1)) return;
+            state.statusHours = nextHours;
+            state.globalStatusRows = [];
+            state.globalLatestTs = 0;
+            setStatusRangeActive(nextHours);
+            loadGlobalStats({ replace: true }).catch(function (err) {
+              if (err && err.message === 'unauthorized') return;
+              showToast('全局状态刷新失败。', 'error');
+            });
+          });
+        }
+        setStatusRangeActive(state.statusHours);
+      }
+
+      function startGlobalStatusPolling() {
+        if (state.statusPollTimer) {
+          clearInterval(state.statusPollTimer);
+          state.statusPollTimer = null;
+        }
+        state.statusPollTimer = setInterval(function () {
+          loadGlobalStats({ replace: false }).catch(function (err) {
+            if (err && err.message === 'unauthorized') return;
+          });
+        }, 15000);
+        return loadGlobalStats({ replace: true });
+      }
+
+      function startRiskStatusPolling() {
+        if (state.riskPollTimer) {
+          clearInterval(state.riskPollTimer);
+          state.riskPollTimer = null;
+        }
+        state.riskPollTimer = setInterval(function () {
+          loadRiskStatus().catch(function (err) {
+            if (err && err.message === 'unauthorized') return;
+          });
+        }, 15000);
+        return loadRiskStatus();
+      }
+
+      async function loadHistory() {
+        var resp = await apiRequest('/user/api/history?page=1&limit=50');
+        var payload = await resp.json();
+        if (!resp.ok || !payload || payload.success !== true) {
+          throw new Error((payload && payload.error) ? payload.error : 'history_load_failed');
+        }
+
+        var rows = Array.isArray(payload.data) ? payload.data : [];
+        state.historyRows = rows;
+
+        renderHistoryRows(rows);
+
+        var meta = payload.meta || {};
+        var total = Number(meta.total || rows.length);
+        var page = Number(meta.page || 1);
+        var pages = Number(meta.pages || 1);
+        setText('historyMeta', '共 ' + formatNumber(total) + ' 条，当前第 ' + page + ' / ' + pages + ' 页，展示最近 50 条。');
+      }
+
+      async function copyFullKey() {
+        var key = String(state.fullApiKey || '').trim();
+        if (!key) {
+          showToast('Key 仅支持复制一次，请轮换生成新 Key。', 'error');
+          return;
+        }
+
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(key);
+          } else {
+            var input = document.createElement('textarea');
+            input.value = key;
+            input.setAttribute('readonly', 'readonly');
+            input.style.position = 'fixed';
+            input.style.opacity = '0';
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+          }
+          showToast('Key 已复制，此后不再显示，请妥善保存。', 'ok');
+        } catch (_) {
+          showToast('复制失败，请手动复制。', 'error');
+        }
+      }
+
+      async function rotateKey() {
+        var ok = window.confirm('轮换后旧 Key 会立即失效，确定继续吗？');
+        if (!ok) return;
+
+        var button = $('rotateKeyBtn');
+        button.disabled = true;
+
+        try {
+          var resp = await apiRequest('/auth/api-key/rotate', {
+            method: 'POST',
+            body: {}
+          });
+          var payload = await resp.json();
+          if (!resp.ok || !payload || payload.success !== true || !payload.data) {
+            throw new Error((payload && payload.error) ? payload.error : 'rotate_failed');
+          }
+
+          var data = payload.data || {};
+          var masked = String(data.masked || '').trim();
+          var full = String(data.api_key || '').trim();
+
+          if (masked) setText('maskedKey', masked);
+          if (full) showOneTimeKey(full);
+
+          showToast('API Key 已轮换，新 Key 仅显示一次。', 'ok');
+        } catch (err) {
+          showToast('轮换失败：' + (err && err.message ? err.message : 'unknown'), 'error');
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      async function logout() {
+        var button = $('logoutBtn');
+        button.disabled = true;
+        try {
+          await fetch('/auth/logout', {
+            method: 'POST',
+            credentials: 'same-origin'
+          });
+        } catch (_) {
+        } finally {
+          window.location.replace('/login');
+        }
+      }
+
+      async function init() {
+        renderStatusStrip([]);
+        setText('requestStatusSummary', '正在加载全局状态...');
+        try {
+          await loadProfile();
+        } catch (err) {
+          if (!(err && err.message === 'unauthorized')) {
+            window.location.replace('/login');
+          }
+          return;
+        }
+
+        bindStatusRangeSelector();
+        var results = await Promise.allSettled([loadUsage(), loadHistory(), startGlobalStatusPolling(), startRiskStatusPolling()]);
+        for (var i = 0; i < results.length; i++) {
+          if (results[i].status === 'rejected') {
+            showToast('部分数据加载失败，页面已展示可用内容。', 'error');
+            break;
+          }
+        }
+      }
+
+      $('copyKeyBtn').addEventListener('click', copyFullKey);
+      $('rotateKeyBtn').addEventListener('click', rotateKey);
+      $('logoutBtn').addEventListener('click', logout);
+      initThemeToggle();
+      window.addEventListener('beforeunload', function () {
+        if (state.statusPollTimer) {
+          clearInterval(state.statusPollTimer);
+          state.statusPollTimer = null;
+        }
+        if (state.riskPollTimer) {
+          clearInterval(state.riskPollTimer);
+          state.riskPollTimer = null;
+        }
+      });
+
+      init();
+    })();
+  </script>
+</body>
+</html>

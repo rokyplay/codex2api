@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://cdn.discordapp.com https:; connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>codex2api · 隐私条款与免责声明</title>
+  <link rel="icon" href="/user/assets/favicon.webp" type="image/webp">
+  <link rel="icon" href="/user/assets/favicon.jpg" type="image/jpeg">
+  <link rel="stylesheet" href="/style.css">
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('codex2api_theme');
+        if (saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <style>
+    :root {
+      --bg-primary: var(--color-bg);
+      --bg-secondary: var(--color-bg-secondary);
+      --surface: var(--color-surface);
+      --border: var(--color-border);
+      --text-primary: var(--color-text-primary);
+      --text-secondary: var(--color-text-secondary);
+      --text-muted: var(--color-text-muted);
+      --accent: var(--color-accent);
+      --accent-hover: var(--color-accent-hover);
+      --danger: var(--color-danger);
+      --shadow: var(--shadow-lg);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      font-family: var(--font-family);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.7;
+    }
+
+    .theme-toolbar {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 20;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+
+    .theme-toggle:hover {
+      background: var(--color-surface-hover);
+      border-color: var(--color-border-hover);
+    }
+
+    .page {
+      width: min(920px, calc(100% - 24px));
+      margin: 14px auto 20px;
+    }
+
+    .top-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text-primary);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 7px 12px;
+    }
+
+    .top-link:hover {
+      border-color: var(--color-border-hover);
+      background: var(--color-surface-hover);
+    }
+
+    .card {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--bg-secondary);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.3;
+    }
+
+    .meta {
+      margin-top: 6px;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    h2 {
+      margin: 18px 0 8px;
+      font-size: 20px;
+    }
+
+    ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    li {
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .terms-emphasis {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .accept {
+      margin-top: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text-secondary);
+      font-size: 14px;
+      padding: 10px 12px;
+    }
+
+    .site-footer {
+      margin-top: 14px;
+      color: var(--text-muted);
+      text-align: center;
+      font-size: 12px;
+    }
+
+    @media (max-width: 680px) {
+      .page {
+        width: calc(100% - 14px);
+      }
+
+      .card {
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="theme-toolbar">
+    <button id="themeToggleBtn" class="theme-toggle" type="button" aria-label="切换主题">浅色模式</button>
+  </div>
+  <main class="page" aria-label="隐私条款与免责声明页面">
+    <a class="top-link" href="/login" aria-label="返回登录">← 返回登录</a>
+
+    <section class="card">
+      <h1>隐私条款与免责声明</h1>
+      <p class="meta">生效日期：2026-03-05</p>
+
+      <hr>
+
+      <h2>一、隐私条款</h2>
+      <ol>
+        <li>为完成身份验证与访问控制，我们会收集并处理第三方 OAuth 账号的基本信息，包括但不限于：用户名、账号 ID、头像信息。</li>
+        <li class="terms-emphasis">我们不收集、不存储、不审核用户的对话内容（prompt 和 response），也不会进行对话正文级别的人工审查。</li>
+        <li class="terms-emphasis">为防止滥用并维护服务稳定性，我们仅收集技术行为元数据，包括但不限于：请求时间、请求频率、Token 用量统计、错误率、模型调用分布、并发与时段分布。</li>
+        <li class="terms-emphasis">在网络与设备标识方面，我们记录 IP 地址的哈希值（不存储明文 IP）与 User-Agent 哈希，用于识别异常行为模式。</li>
+        <li class="terms-emphasis">上述行为数据仅用于自动化风控、滥用检测、容量治理与故障排查，不用于广告或画像变现。</li>
+        <li class="terms-emphasis">行为数据默认保留 2 天并自动清理；超过保留期限的数据会按清理策略删除。</li>
+        <li>我们不会将您的数据出售给任何第三方，也不会向第三方提供可识别个人身份的数据，法律法规另有要求的除外。您一旦使用本服务，即视为已阅读、理解并同意本隐私条款的全部内容。</li>
+      </ol>
+
+      <h2>二、免责声明</h2>
+      <ol>
+        <li>本服务仅供学习与研究用途，严禁用于任何商业化目的。</li>
+        <li>我们不对服务的可用性、稳定性、连续性作任何明示或默示保证，服务可能在任何时间中断、调整或终止。</li>
+        <li>用户应对自身使用行为承担全部法律责任，包括但不限于由输入、输出、分发、二次开发所引发的风险与后果。</li>
+        <li>严禁将本服务用于违法违规活动，包括但不限于暴力、赌博、诈骗、侵权、恶意攻击等行为。</li>
+        <li>严禁将本服务接入商业化软件、商业化平台或以营利为目的的系统；仅允许个人在开源软件场景下进行非商业使用。</li>
+        <li>因使用或无法使用本服务所导致的任何直接、间接、附带、特殊或后果性损失，服务提供方不承担责任。</li>
+        <li>对违反本条款、滥用服务或存在安全风险的账号，我们有权不经通知立即限制或终止其访问权限。</li>
+        <li>我们保留随时更新、修改本条款内容的权利；更新后的条款一经发布即生效。</li>
+        <li>用户应遵守其所在地适用的法律法规与监管要求；若用户行为与法律法规冲突，由用户自行承担全部责任。</li>
+      </ol>
+
+      <h2>三、条款接受</h2>
+      <div class="accept">继续使用本服务即表示您已充分阅读并同意本隐私条款与免责声明。若您不同意本条款，请立即停止使用本服务。</div>
+
+      <p class="site-footer">by Rok & Nan · 出于热爱与好奇而构建 ✨</p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('themeToggleBtn');
+      if (!btn) return;
+
+      function syncThemeLabel() {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        btn.textContent = isDark ? '深色模式' : '浅色模式';
+      }
+
+      btn.addEventListener('click', function () {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        if (isDark) {
+          document.documentElement.removeAttribute('data-theme');
+          try { localStorage.setItem('codex2api_theme', 'light'); } catch (_) {}
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          try { localStorage.setItem('codex2api_theme', 'dark'); } catch (_) {}
+        }
+        syncThemeLabel();
+      });
+
+      syncThemeLabel();
+    })();
+  </script>
+</body>
+</html>

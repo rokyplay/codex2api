@@ -1,0 +1,323 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8066,
+    "default_identity": "rok",
+    "password": "YOUR_PASSWORD",
+    "admin_password": "YOUR_ADMIN_PASSWORD",
+    "admin_username": "rok",
+    "session_max_age_hours": 720,
+    "totp_enabled": true,
+    "totp_secret": "YOUR_TOTP_SECRET",
+    "totp_period_seconds": 30,
+    "totp_digits": 6,
+    "totp_window": 1,
+    "totp_issuer": "codex2api",
+    "totp_allow_passwordless": true,
+    "api_keys": [
+      {
+        "id": "user1_20260101",
+        "identity": "user1",
+        "key": "YOUR_KEY",
+        "enabled": true,
+        "created_at": "2026-03-02T00:00:00.000Z"
+      }
+    ]
+  },
+  "discord_auth": {
+    "enabled": true,
+    "client_id": "YOUR_DISCORD_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET",
+    "redirect_uri": "https://example.com/auth/discord/callback",
+    "scopes": "identify guilds.members.read",
+    "guild_id": "YOUR_DISCORD_GUILD_ID",
+    "required_roles": [
+      "YOUR_REQUIRED_ROLE_ID"
+    ],
+    "public_domain": "example.com",
+    "turnstile": {
+      "enabled": true,
+      "site_key": "YOUR_SITE_KEY",
+      "secret_key": "YOUR_SECRET_KEY"
+    },
+    "session_ttl_hours": 48,
+    "api_key_prefix": "dk-",
+    "state_ttl_seconds": 300
+  },
+  "upstream": {
+    "base_url": "https://chatgpt.com/backend-api",
+    "timeout": 120000,
+    "stream_timeout": 300000
+  },
+  "models": {
+    "prefix": "codex/",
+    "default": "gpt-5.3-codex",
+    "available": {
+      "gpt-5-codex-mini": {
+        "display_name": "GPT-5 Codex Mini",
+        "enabled": true
+      },
+      "gpt-5-codex": {
+        "display_name": "GPT-5 Codex",
+        "enabled": true
+      },
+      "gpt-5.1-codex": {
+        "display_name": "GPT-5.1 Codex",
+        "enabled": true
+      },
+      "gpt-5.1-codex-max": {
+        "display_name": "GPT-5.1 Codex Max",
+        "enabled": true
+      },
+      "gpt-5.2-codex": {
+        "display_name": "GPT-5.2 Codex",
+        "enabled": true
+      },
+      "gpt-5.3-codex": {
+        "display_name": "GPT-5.3 Codex",
+        "enabled": true
+      },
+      "gpt-5.4": {
+        "display_name": "GPT-5.4",
+        "enabled": true
+      },
+      "gpt-5.2": {
+        "display_name": "GPT-5.2",
+        "enabled": true
+      },
+      "gpt-5.1": {
+        "display_name": "GPT-5.1",
+        "enabled": true
+      },
+      "gpt-5.1-codex-mini": {
+        "display_name": "GPT-5.1 Codex Mini",
+        "enabled": true
+      }
+    },
+    "aliases": {
+      "gpt-5-codex-latest": "gpt-5.3-codex"
+    }
+  },
+  "scheduler": {
+    "mode": "round_robin"
+  },
+  "retry": {
+    "max_retries": 3,
+    "backoff_ms": 1000,
+    "first_byte_timeout_ms": 30000,
+    "idle_timeout_ms": 60000,
+    "total_timeout_ms": 600000
+  },
+  "rate_limit": {
+    "requests_per_minute": 500,
+    "cooldown_ms": 300000
+  },
+  "health_check": {
+    "enabled": true,
+    "interval_minutes": 10,
+    "endpoint": "/me"
+  },
+  "accounts_source": "./accounts.json",
+  "credentials": {
+    "auto_refresh": true,
+    "auto_relogin": false,
+    "refresh_before_expiry_seconds": 300,
+    "session_keepalive_hours": 12,
+    "session_invalidated_relogin": true,
+    "session_invalidated_relogin_threshold": 1,
+    "relogin_interval_ms": 60000,
+    "relogin_max_retries": 5,
+    "relogin_delay_ms": 10000,
+    "support_browser_login": true,
+    "api_token": "YOUR_API_TOKEN",
+    "relogin_concurrency": 20
+  },
+  "proxy": {
+    "enabled": true,
+    "server": "socks5://YOUR_PROXY_HOST:YOUR_PROXY_PORT",
+    "username": "YOUR_PROXY_USERNAME",
+    "password": "YOUR_PROXY_PASSWORD",
+    "active_preset": "sample_a",
+    "presets": {
+      "sample_a": {
+        "label": "Sample Node Group A",
+        "port": "YOUR_PORT"
+      },
+      "sample_b": {
+        "label": "Sample Node Group B",
+        "port": "YOUR_PORT"
+      },
+      "sample_c": {
+        "label": "Sample Node Group C",
+        "port": "YOUR_PORT"
+      }
+    },
+    "node_groups": [
+      {
+        "label": "sample-group-a",
+        "nodes": [
+          {
+            "name": "sample-node-1",
+            "port": "YOUR_PORT"
+          },
+          {
+            "name": "sample-node-2",
+            "port": "YOUR_PORT"
+          }
+        ]
+      },
+      {
+        "label": "sample-group-b",
+        "nodes": [
+          {
+            "name": "sample-node-3",
+            "port": "YOUR_PORT"
+          }
+        ]
+      }
+    ],
+    "host": "127.0.0.1",
+    "register_proxy": {
+      "enabled": true,
+      "server": "socks5://YOUR_PROXY_HOST:YOUR_PROXY_PORT",
+      "active_preset": "sample_a",
+      "proxy_rotation": {
+        "enabled": true,
+        "test_url": "https://auth.openai.com/authorize",
+        "test_timeout_ms": 8000,
+        "prefer_workers": true,
+        "workers_ports": [
+          "YOUR_PORT",
+          "YOUR_PORT"
+        ],
+        "fullroute_ports": [
+          "YOUR_PORT",
+          "YOUR_PORT",
+          "YOUR_PORT"
+        ],
+        "socks_auth": "YOUR_SOCKS_AUTH",
+        "socks_host": "YOUR_PROXY_HOST"
+      }
+    }
+  },
+  "prompt_cache": {
+    "enabled": true,
+    "session_id_strategy": "client_or_derived",
+    "default_retention": null,
+    "allow_client_override": true
+  },
+  "fake_non_stream": true,
+  "stats": {
+    "enabled": true,
+    "retention_days": 30,
+    "recent_buffer_size": 200
+  },
+  "abuse_detection": {
+    "enabled": true,
+    "retention_days": 90,
+    "cleanup_interval_hours": 6,
+    "actions": {
+      "throttle_min_interval_ms": 3000
+    },
+    "thresholds": {
+      "observe_max": 49,
+      "throttle_min": 50,
+      "challenge_min": 60,
+      "suspend_min": 80
+    },
+    "auto_decay": {
+      "enabled": true,
+      "interval_ms": 600000,
+      "description": "10分钟无新违规自动恢复到observe"
+    },
+    "rules": {
+      "high_frequency": {
+        "enabled": true,
+        "threshold": 120,
+        "score": 20
+      },
+      "high_concurrency": {
+        "enabled": true,
+        "threshold": 20,
+        "score": 15
+      },
+      "multi_account_ip": {
+        "enabled": true,
+        "threshold": 5,
+        "score": 20
+      },
+      "no_sleep_window": {
+        "enabled": true,
+        "threshold": 90,
+        "score": 10
+      },
+      "periodic_pattern": {
+        "enabled": true,
+        "max_cv": 0.35,
+        "min_samples": 12,
+        "score": 15
+      },
+      "high_error_rate": {
+        "enabled": true,
+        "threshold": 0.5,
+        "min_requests": 20,
+        "score": 15
+      },
+      "token_abuse": {
+        "enabled": true,
+        "threshold": 50000000,
+        "score": 20
+      }
+    }
+  },
+  "register": {
+    "enabled": true,
+    "api_url": "http://YOUR_REGISTER_HOST:YOUR_REGISTER_PORT",
+    "api_token": "YOUR_REGISTER_API_TOKEN",
+    "remote_ssh_host": "YOUR_SSH_HOST",
+    "remote_ssh_user": "YOUR_SSH_USER",
+    "remote_service_name": "YOUR_SERVICE_NAME",
+    "auto_start_enabled": true,
+    "defaults": {
+      "count": 50,
+      "concurrency": 50,
+      "proxy": true,
+      "auto_upload": true
+    }
+  },
+  "pool_health": {
+    "enabled": true,
+    "auto_check_batch_size": 100,
+    "auto_check_interval_ms": 600000,
+    "manual_verify_concurrency": 20,
+    "health_probe_interval_ms": 900000,
+    "health_probe_sample_size": 50,
+    "health_probe_concurrency": 10,
+    "new_account_verify_delay_ms": 300000,
+    "new_account_verify_enabled": true,
+    "pool_guard_interval_ms": 7200000,
+    "pool_guard_min_active": 10000,
+    "pool_guard_max_register": 9999,
+    "pool_guard_min_register": 50,
+    "pool_guard_batch_size": 50,
+    "pool_guard_batch_interval_ms": 3000,
+    "test_model": ""
+  },
+  "register_server": {
+    "url": "http://YOUR_REGISTER_HOST:YOUR_REGISTER_PORT",
+    "token": "YOUR_TOKEN",
+    "relogin_timeout_ms": 120000
+  },
+  "rate_limits": {
+    "enabled": true,
+    "global": {
+      "rpm": 0,
+      "tpm": 0
+    },
+    "default_per_user": {
+      "rpm": 0,
+      "tpm": 0
+    },
+    "overrides": {}
+  }
+}
