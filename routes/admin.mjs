@@ -4000,7 +4000,8 @@ function enrichAbuseUsersWithIdentityProfile(rows, config) {
   var enriched = [];
   for (var j = 0; j < list.length; j++) {
     var row = list[j] && typeof list[j] === 'object' ? Object.assign({}, list[j]) : {};
-    var identity = String(row.caller_identity || row.id || '').trim();
+    var identity = String(row.identity || row.caller_identity || row.id || '').trim();
+    if (!identity || identity === 'unknown') continue;
     var discordUserId = '';
     if (identity.indexOf('discord:') === 0) {
       discordUserId = identity.slice('discord:'.length);
@@ -4014,24 +4015,72 @@ function enrichAbuseUsersWithIdentityProfile(rows, config) {
       discordUserId = String(row.user.discord_user_id || '').trim();
     }
 
-    var seqId = '';
-    var discordUsername = '';
-    var discordDisplayName = '';
-    var avatarUrl = '';
+    var seqId = String(row.seq_id || '').trim();
+    var username = String(row.username || row.discord_username || '').trim();
+    var displayName = String(row.display_name || row.discord_display_name || '').trim();
+    var avatarUrl = String(row.avatar_url || '').trim();
+    var createdAt = String(row.created_at || '').trim();
     if (profile) {
-      seqId = String(profile.seq_id || '').trim();
-      discordUsername = String(profile.username || '').trim();
-      discordDisplayName = String(profile.global_name || '').trim();
-      avatarUrl = buildDiscordAvatarUrl(discordUserId, profile.avatar);
+      if (!seqId) seqId = String(profile.seq_id || '').trim();
+      if (!username) username = String(profile.username || '').trim();
+      if (!displayName) displayName = String(profile.global_name || profile.username || '').trim();
+      if (!avatarUrl) avatarUrl = buildDiscordAvatarUrl(discordUserId, profile.avatar);
+      if (!createdAt) createdAt = String(profile.created_at || '').trim();
     } else {
-      seqId = adminSeqMap.get(identity) || '';
-      discordDisplayName = identity;
+      if (!seqId) seqId = adminSeqMap.get(identity) || '';
+      if (!displayName) displayName = identity;
     }
 
+    if (!username && identity.indexOf('discord:') !== 0) username = identity;
+    if (!displayName) displayName = username || identity;
+
+    var hitRules = [];
+    if (Array.isArray(row.hit_rules)) {
+      for (var h = 0; h < row.hit_rules.length; h++) {
+        var hit = String(row.hit_rules[h] || '').trim();
+        if (hit) hitRules.push(hit);
+      }
+    } else if (Array.isArray(row.reasons)) {
+      for (var hr = 0; hr < row.reasons.length; hr++) {
+        var reason = row.reasons[hr] || {};
+        var ruleId = String(reason.rule_id || '').trim();
+        if (ruleId) hitRules.push(ruleId);
+      }
+    }
+
+    row.identity = identity;
+    row.id = identity;
+    row.caller_identity = identity;
     row.seq_id = seqId;
-    row.discord_username = discordUsername;
-    row.discord_display_name = discordDisplayName || discordUsername || identity;
+    row.username = username;
+    row.display_name = displayName;
     row.avatar_url = avatarUrl;
+    row.created_at = createdAt;
+    row.requests = Math.max(0, Math.floor(toFiniteNumber(row.requests, 0)));
+    row.input_tokens = Math.max(0, Math.floor(toFiniteNumber(row.input_tokens, 0)));
+    row.output_tokens = Math.max(0, Math.floor(toFiniteNumber(row.output_tokens, 0)));
+    row.cached_tokens = Math.max(0, Math.floor(toFiniteNumber(row.cached_tokens, 0)));
+    row.first_seen = Math.max(0, Math.floor(toFiniteNumber(row.first_seen, 0)));
+    row.last_seen = Math.max(0, Math.floor(toFiniteNumber(row.last_seen, 0)));
+    row.score = Math.max(0, Math.floor(toFiniteNumber(row.score, 0)));
+    row.level = String(row.level || 'low');
+    row.action = String(row.action || 'observe');
+    row.hit_rules = hitRules;
+    row.reasons_count = Math.max(hitRules.length, Math.floor(toFiniteNumber(row.reasons_count, hitRules.length)));
+
+    // 兼容旧字段，避免前端和其他调用方受影响
+    row.discord_username = username;
+    row.discord_display_name = displayName;
+
+    if (!row.user || typeof row.user !== 'object') {
+      row.user = {
+        discord_user_id: discordUserId,
+        username: username,
+        global_name: displayName,
+        status: '',
+        last_login_at: '',
+      };
+    }
     enriched.push(row);
   }
   return enriched;
@@ -4141,7 +4190,7 @@ function handleAbuseUsers(req, res, ctx) {
     limit: parseInt(query.limit || '50', 10),
     level: query.level || '',
     action: query.action || '',
-    sort: query.sort || 'score_desc',
+    sort: query.sort || 'requests_desc',
     keyword: query.q || query.keyword || '',
   });
   var rows = enrichAbuseUsersWithIdentityProfile(result.data || [], ctx && ctx.config ? ctx.config : null);
@@ -4208,15 +4257,20 @@ function readAbuseUserHistory(identity, dates) {
         var callerIdentity = String(raw.caller_identity || '').trim();
         if (callerIdentity !== identity) continue;
         var ts = Math.floor(toFiniteNumber(raw.ts, 0));
+        var statusCode = Math.floor(toFiniteNumber(raw.status, 0));
+        var latencyMs = Math.max(0, Math.floor(toFiniteNumber(raw.latency, 0)));
         rows.push({
-          _ts: ts,
+          _sort_ts: ts,
+          ts: ts,
           timestamp: ts > 0 ? new Date(ts).toISOString() : '',
           model: String(raw.model || ''),
           input_tokens: Math.max(0, Math.floor(toFiniteNumber(raw.input_tokens, 0))),
           output_tokens: Math.max(0, Math.floor(toFiniteNumber(raw.output_tokens, 0))),
           cached_tokens: Math.max(0, Math.floor(toFiniteNumber(raw.cached_tokens, 0))),
-          status_code: Math.floor(toFiniteNumber(raw.status, 0)),
-          latency_ms: Math.max(0, Math.floor(toFiniteNumber(raw.latency, 0))),
+          status: statusCode,
+          status_code: statusCode,
+          latency: latencyMs,
+          latency_ms: latencyMs,
           ip: String(raw.ip || ''),
         });
       } catch (_) {
@@ -4226,7 +4280,7 @@ function readAbuseUserHistory(identity, dates) {
   }
 
   rows.sort(function (a, b) {
-    return toFiniteNumber(b._ts, 0) - toFiniteNumber(a._ts, 0);
+    return toFiniteNumber(b._sort_ts, 0) - toFiniteNumber(a._sort_ts, 0);
   });
   return rows;
 }
@@ -4252,7 +4306,7 @@ function handleAbuseUserHistory(req, res, ctx, userId) {
   var data = [];
   for (var i = 0; i < pageRows.length; i++) {
     var row = Object.assign({}, pageRows[i]);
-    delete row._ts;
+    delete row._sort_ts;
     data.push(row);
   }
 

@@ -430,6 +430,9 @@
                 <option value="critical" data-i18n="abuse.level_critical">严重</option>
               </select>
               <select id="abuseSortSelect" class="input" style="min-width:140px;">
+                <option value="requests_desc" data-i18n="abuse.sort_requests_desc">请求数降序</option>
+                <option value="last_seen_desc" data-i18n="abuse.sort_last_seen_desc">最近活跃</option>
+                <option value="created_desc" data-i18n="abuse.sort_created_desc">最近注册</option>
                 <option value="score_desc" data-i18n="abuse.sort_score_desc">分数降序</option>
                 <option value="score_asc" data-i18n="abuse.sort_score_asc">分数升序</option>
                 <option value="updated_desc" data-i18n="abuse.sort_updated_desc">最近评估</option>
@@ -444,6 +447,7 @@
                 <thead>
                   <tr>
                     <th data-i18n="abuse.col_seq_id">序号</th>
+                    <th data-i18n="abuse.col_avatar">头像</th>
                     <th data-i18n="abuse.col_username">用户名</th>
                     <th data-i18n="abuse.col_requests">请求数</th>
                     <th data-i18n="abuse.col_input_tokens">输入Token</th>
@@ -455,7 +459,7 @@
                   </tr>
                 </thead>
                 <tbody id="abuseUsersBody">
-                  <tr><td colspan="9"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
+                  <tr><td colspan="10"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
                 </tbody>
               </table>
             </div>

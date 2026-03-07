@@ -221,6 +221,15 @@ function appendConfiguredIdentity(set, value) {
   set.add(identity);
 }
 
+function buildDiscordAvatarUrl(discordUserId, avatarHash, size) {
+  var userId = String(discordUserId || '').trim();
+  var avatar = String(avatarHash || '').trim();
+  var iconSize = Math.max(16, Math.floor(toPositiveInt(size, 32)));
+  if (!userId || !avatar) return '';
+  if (/^https?:\/\//i.test(avatar)) return avatar;
+  return 'https://cdn.discordapp.com/avatars/' + userId + '/' + avatar + '.png?size=' + iconSize;
+}
+
 function collectConfiguredNonDiscordIdentities() {
   var serverCfg = (config && config.server) || {};
   var identitySet = new Set();
@@ -264,10 +273,69 @@ function getDiscordRegisteredUserCount() {
   }
 }
 
+function getAbuseRegisteredUsers() {
+  var rows = [];
+  var seen = new Set();
+
+  if (existsSync(DISCORD_USERS_FILE)) {
+    try {
+      var raw = JSON.parse(readFileSync(DISCORD_USERS_FILE, 'utf8'));
+      var users = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw.users : null;
+      if (users && typeof users === 'object' && !Array.isArray(users)) {
+        var ids = Object.keys(users);
+        for (var i = 0; i < ids.length; i++) {
+          var discordUserId = String(ids[i] || '').trim();
+          if (!discordUserId) continue;
+          var identity = 'discord:' + discordUserId;
+          if (seen.has(identity)) continue;
+          seen.add(identity);
+
+          var user = users[discordUserId] && typeof users[discordUserId] === 'object' ? users[discordUserId] : {};
+          var username = String(user.username || '').trim();
+          var globalName = String(user.global_name || '').trim();
+          var avatar = String(user.avatar || '').trim();
+          rows.push({
+            identity: identity,
+            discord_user_id: discordUserId,
+            username: username,
+            global_name: globalName,
+            display_name: globalName || username || identity,
+            seq_id: String(user.seq_id || '').trim(),
+            avatar: avatar,
+            avatar_url: buildDiscordAvatarUrl(discordUserId, avatar, 32),
+            created_at: String(user.created_at || '').trim(),
+          });
+        }
+      }
+    } catch (_) {
+      // ignore parse errors
+    }
+  }
+
+  var nonDiscordIdentities = collectConfiguredNonDiscordIdentities();
+  for (var j = 0; j < nonDiscordIdentities.length; j++) {
+    var adminIdentity = String(nonDiscordIdentities[j] || '').trim();
+    if (!adminIdentity || seen.has(adminIdentity)) continue;
+    seen.add(adminIdentity);
+    rows.push({
+      identity: adminIdentity,
+      discord_user_id: '',
+      username: adminIdentity,
+      global_name: '',
+      display_name: adminIdentity,
+      seq_id: 'admin_' + String(j + 1),
+      avatar: '',
+      avatar_url: '',
+      created_at: '',
+    });
+  }
+
+  return rows;
+}
+
 function getAbuseOverviewUserCount() {
-  var registeredDiscordUsers = getDiscordRegisteredUserCount();
-  var adminUsers = collectConfiguredNonDiscordIdentities();
-  return registeredDiscordUsers + adminUsers.length;
+  var registeredUsers = getAbuseRegisteredUsers();
+  return Array.isArray(registeredUsers) ? registeredUsers.length : 0;
 }
 
 var behaviorAggregator = new BehaviorAggregator({
@@ -282,6 +350,7 @@ var ruleEngine = new RuleEngine({
   aggregator: behaviorAggregator,
   riskLogger: riskLogger,
   getUserCount: getAbuseOverviewUserCount,
+  getRegisteredUsers: getAbuseRegisteredUsers,
 });
 var rateLimiter = new RateLimiter((config && config.rate_limits) || {});
 

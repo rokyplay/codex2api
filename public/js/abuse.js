@@ -12,7 +12,7 @@ var Abuse = (function () {
     page: 1,
     limit: 50,
     level: '',
-    sort: 'score_desc',
+    sort: 'requests_desc',
     keyword: '',
   };
   var _lastUsers = [];
@@ -61,24 +61,41 @@ var Abuse = (function () {
     return Math.max(0, Math.floor(n));
   }
 
-  function _formatCompactNumber(value) {
+  function formatTokenCount(value) {
     var n = _safeInt(value);
-    if (n >= 1000000) {
-      return (Math.round(n / 100000) / 10).toFixed(1).replace(/\.0$/, '') + 'M';
-    }
-    if (n >= 1000) {
-      return (Math.round(n / 100) / 10).toFixed(1).replace(/\.0$/, '') + 'K';
-    }
+    if (n < 1000) return String(n);
+    if (n < 1000000) return (n / 1000).toFixed(1) + 'K';
+    return (n / 1000000).toFixed(1) + 'M';
+  }
+
+  function _formatRequestCount(value) {
+    var n = _safeInt(value);
     return String(n);
   }
 
   function _formatDateTimeValue(value) {
     if (value === null || value === undefined || value === '') return '-';
     var n = Number(value);
-    if (isFinite(n) && n > 0) {
+    if (isFinite(n)) {
+      if (n <= 0) return '-';
       return formatDateTime(new Date(n).toISOString());
     }
+    var parsed = Date.parse(String(value || ''));
+    if (!isFinite(parsed) || parsed <= 0) return '-';
     return formatDateTime(value);
+  }
+
+  function _renderAvatarCell(row, displayName) {
+    var avatarUrl = String((row && row.avatar_url) || '').trim();
+    var safeDisplay = escapeHtml(displayName || '');
+    if (avatarUrl) {
+      return '<img class="abuse-avatar" src="' + escapeHtml(avatarUrl) + '" alt="' + safeDisplay + '" loading="lazy">';
+    }
+    return '<span class="abuse-avatar-fallback" aria-hidden="true">'
+      + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+      + '<circle cx="12" cy="8" r="4"></circle><path d="M4 20a8 8 0 0 1 16 0"></path>'
+      + '</svg>'
+      + '</span>';
   }
 
   function _isHistoryExpanded(identity) {
@@ -125,20 +142,18 @@ var Abuse = (function () {
       + '<th>' + escapeHtml(t('abuse.col_cached_tokens')) + '</th>'
       + '<th>' + escapeHtml(t('abuse.col_status')) + '</th>'
       + '<th>' + escapeHtml(t('abuse.col_latency')) + '</th>'
-      + '<th>' + escapeHtml(t('abuse.col_ip')) + '</th>'
       + '</tr></thead><tbody>';
 
     for (var i = 0; i < state.data.length; i++) {
       var item = state.data[i] || {};
       html += '<tr>'
-        + '<td class="td-mono">' + escapeHtml(_formatDateTimeValue(item.timestamp || '')) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatDateTimeValue(item.ts || item.timestamp || '')) + '</td>'
         + '<td class="td-mono">' + escapeHtml(String(item.model || '-')) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(item.input_tokens || 0)) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(item.output_tokens || 0)) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(item.cached_tokens || 0)) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(String(item.status_code || 0)) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(String(_safeInt(item.latency_ms || 0))) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(String(item.ip || '-')) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(formatTokenCount(item.input_tokens || 0)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(formatTokenCount(item.output_tokens || 0)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(formatTokenCount(item.cached_tokens || 0)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(String(_safeInt(item.status || item.status_code || 0))) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(String(_safeInt(item.latency || item.latency_ms || 0))) + '</td>'
         + '</tr>';
     }
     html += '</tbody></table></div></div>';
@@ -215,22 +230,22 @@ var Abuse = (function () {
     var body = document.getElementById('abuseUsersBody');
     if (!body) return;
     if (!Array.isArray(users) || users.length === 0) {
-      body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><span>' + escapeHtml(t('abuse.users_empty')) + '</span></div></td></tr>';
+      body.innerHTML = '<tr><td colspan="10"><div class="empty-state"><span>' + escapeHtml(t('abuse.users_empty')) + '</span></div></td></tr>';
       return;
     }
     var html = '';
     for (var i = 0; i < users.length; i++) {
       var row = users[i] || {};
       var user = row.user || null;
-      var identity = String(row.caller_identity || row.id || '');
+      var identity = String(row.identity || row.caller_identity || row.id || '');
       var score = _safeInt(row.score || 0);
       var seqId = String(row.seq_id || '').trim() || '-';
-      var displayName = String(row.discord_display_name || '').trim();
+      var displayName = String(row.display_name || row.discord_display_name || '').trim();
       if (!displayName && user && (user.global_name || user.username)) {
         displayName = String(user.global_name || user.username || '').trim();
       }
       if (!displayName) displayName = identity || '-';
-      var usernameHover = String(row.discord_username || '').trim();
+      var usernameHover = String(row.username || row.discord_username || '').trim();
       if (!usernameHover && user && user.username) usernameHover = String(user.username || '').trim();
       var requests = _safeInt(row.requests || 0);
       var inputTokens = _safeInt(row.input_tokens || 0);
@@ -240,21 +255,22 @@ var Abuse = (function () {
 
       html += '<tr class="abuse-user-row" data-identity="' + escapeHtml(identity) + '">'
         + '<td class="td-mono">' + escapeHtml(seqId) + '</td>'
-        + '<td class="td-email" title="' + escapeHtml(usernameHover || identity) + '">'
+        + '<td><div class="abuse-avatar-wrap">' + _renderAvatarCell(row, displayName) + '</div></td>'
+        + '<td class="td-email" title="' + escapeHtml(identity) + '">'
         + '<span class="abuse-user-name">' + escapeHtml(displayName) + '</span>'
-        + (usernameHover ? '<span class="abuse-user-sub">@' + escapeHtml(usernameHover) + '</span>' : '')
+        + ((usernameHover && usernameHover !== displayName) ? '<span class="abuse-user-sub">@' + escapeHtml(usernameHover) + '</span>' : '')
         + '</td>'
-        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(requests)) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(inputTokens)) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(outputTokens)) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(cachedTokens)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatRequestCount(requests)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(formatTokenCount(inputTokens)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(formatTokenCount(outputTokens)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(formatTokenCount(cachedTokens)) + '</td>'
         + '<td class="td-mono">' + escapeHtml(_formatDateTimeValue(lastActive)) + '</td>'
         + '<td class="td-mono">' + escapeHtml(String(score)) + '</td>'
         + '<td><button class="btn btn-secondary btn-sm abuse-detail-btn" data-identity="' + escapeHtml(identity) + '">' + escapeHtml(t('abuse.view_detail')) + '</button></td>'
         + '</tr>';
 
       if (_isHistoryExpanded(identity)) {
-        html += '<tr class="abuse-history-row"><td colspan="9">'
+        html += '<tr class="abuse-history-row"><td colspan="10">'
           + _renderHistorySection(identity)
           + '</td></tr>';
       }
@@ -544,8 +560,9 @@ var Abuse = (function () {
 
     var sortSelect = document.getElementById('abuseSortSelect');
     if (sortSelect) {
+      sortSelect.value = _userQuery.sort;
       sortSelect.addEventListener('change', function () {
-        _userQuery.sort = sortSelect.value || 'score_desc';
+        _userQuery.sort = sortSelect.value || 'requests_desc';
         _userQuery.page = 1;
         _loadUsers();
       });

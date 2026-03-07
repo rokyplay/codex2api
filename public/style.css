@@ -1154,6 +1154,32 @@ tbody tr:hover {
   font-weight: 600;
 }
 
+.abuse-avatar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.abuse-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  object-fit: cover;
+  display: block;
+}
+
+.abuse-avatar-fallback {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+}
+
 .abuse-user-sub {
   display: block;
   margin-top: 2px;
