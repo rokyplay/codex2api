@@ -1004,6 +1004,50 @@ input, textarea, select {
   margin-bottom: var(--spacing-md);
 }
 
+.gpa-interop-card {
+  margin-bottom: var(--spacing-md);
+}
+
+.gpa-interop-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.gpa-interop-grid {
+  display: grid;
+  gap: var(--spacing-md);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.gpa-interop-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.gpa-result-wrap {
+  margin-top: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.gpa-result-output {
+  margin: 0;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  max-height: 260px;
+  overflow: auto;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* 筛选按钮组 */
 .filter-bar {
   display: flex;
@@ -1103,6 +1147,43 @@ tbody tr:hover {
 
 .td-time {
   font-size: 11px;
+}
+
+.abuse-user-name {
+  display: block;
+  font-weight: 600;
+}
+
+.abuse-user-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.abuse-user-row {
+  cursor: pointer;
+}
+
+.abuse-history-row td {
+  background: var(--color-bg-tertiary);
+}
+
+.abuse-history-section {
+  padding: 8px 0;
+}
+
+.abuse-history-title {
+  margin: 0 0 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.abuse-history-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* ============ 配置页 ============ */

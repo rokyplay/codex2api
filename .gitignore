@@ -1,5 +1,5 @@
 data/
-*.accounts.json
+accounts.json
 config-server.json
 server.log
 tmp/
@@ -16,3 +16,5 @@ codex/
 tests/
 .claude/
 .coderag*
+CLAUDE.md
+docs/

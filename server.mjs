@@ -45,7 +45,13 @@ import { createOpenAIRoutes } from './routes/openai.mjs';
 import { createCodexRoutes } from './routes/codex.mjs';
 import { createAnthropicRoutes } from './routes/anthropic.mjs';
 import { createGeminiRoutes } from './routes/gemini.mjs';
-import { createAdminRoutes, logCollector, initLogPersistence } from './routes/admin.mjs';
+import {
+  createAdminRoutes,
+  logCollector,
+  initLogPersistence,
+  handleCredentialsImportGpaApi,
+  handleCredentialsExportGpaApi,
+} from './routes/admin.mjs';
 import { StatsCollector } from './lib/stats-collector.mjs';
 import * as codexResponses from './lib/converter/openai-responses.mjs';
 import { normalizeCollectedUsage } from './lib/converter/openai-responses.mjs';
@@ -200,6 +206,70 @@ var statsCollector = new StatsCollector({
 });
 
 var ABUSE_CONFIG = (config && config.abuse_detection) || {};
+var DISCORD_USERS_FILE = resolve(__dirname, 'data/discord-users.json');
+
+function normalizeUserIdentity(value) {
+  var identity = String(value || '').trim();
+  if (!identity || identity === 'unknown') return '';
+  return identity;
+}
+
+function appendConfiguredIdentity(set, value) {
+  var identity = normalizeUserIdentity(value);
+  if (!identity) return;
+  if (identity.indexOf('discord:') === 0) return;
+  set.add(identity);
+}
+
+function collectConfiguredNonDiscordIdentities() {
+  var serverCfg = (config && config.server) || {};
+  var identitySet = new Set();
+
+  appendConfiguredIdentity(identitySet, serverCfg.default_identity);
+  appendConfiguredIdentity(identitySet, serverCfg.admin_username);
+
+  var arrayFields = [
+    serverCfg.whitelist,
+    serverCfg.whitelist_identities,
+    serverCfg.admin_users,
+    serverCfg.admin_identities,
+  ];
+  for (var i = 0; i < arrayFields.length; i++) {
+    var identities = arrayFields[i];
+    if (!Array.isArray(identities)) continue;
+    for (var j = 0; j < identities.length; j++) {
+      appendConfiguredIdentity(identitySet, identities[j]);
+    }
+  }
+
+  var apiKeys = Array.isArray(serverCfg.api_keys) ? serverCfg.api_keys : [];
+  for (var k = 0; k < apiKeys.length; k++) {
+    var apiKey = apiKeys[k] || {};
+    if (apiKey.enabled === false) continue;
+    appendConfiguredIdentity(identitySet, apiKey.identity);
+  }
+
+  return Array.from(identitySet);
+}
+
+function getDiscordRegisteredUserCount() {
+  if (!existsSync(DISCORD_USERS_FILE)) return 0;
+  try {
+    var raw = JSON.parse(readFileSync(DISCORD_USERS_FILE, 'utf8'));
+    var users = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw.users : null;
+    if (!users || typeof users !== 'object' || Array.isArray(users)) return 0;
+    return Object.keys(users).length;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function getAbuseOverviewUserCount() {
+  var registeredDiscordUsers = getDiscordRegisteredUserCount();
+  var adminUsers = collectConfiguredNonDiscordIdentities();
+  return registeredDiscordUsers + adminUsers.length;
+}
+
 var behaviorAggregator = new BehaviorAggregator({
   config: ABUSE_CONFIG,
 });
@@ -211,6 +281,7 @@ var ruleEngine = new RuleEngine({
   config: ABUSE_CONFIG,
   aggregator: behaviorAggregator,
   riskLogger: riskLogger,
+  getUserCount: getAbuseOverviewUserCount,
 });
 var rateLimiter = new RateLimiter((config && config.rate_limits) || {});
 
@@ -1162,6 +1233,12 @@ var server = http.createServer(async function (req, res) {
   if (path === '/api/credentials' && req.method === 'POST') {
     return await handleCredentialsAPI(req, res);
   }
+  if (path === '/api/credentials/import/gpa' && req.method === 'POST') {
+    return await handleCredentialsImportGpaApi(req, res, ctx);
+  }
+  if (path === '/api/credentials/export/gpa' && req.method === 'GET') {
+    return await handleCredentialsExportGpaApi(req, res, ctx);
+  }
 
   // ====== 公共域路由隔离 ======
   if (isPublicHost) {
@@ -1872,6 +1949,8 @@ if (!IS_DRY_RUN) {
     log('  ', C.gray, '管理面板:  GET /admin/');
     log('  ', C.gray, '管理API:   /admin/api/*');
     log('  ', C.gray, '凭证API:   POST /api/credentials');
+    log('  ', C.gray, 'GPA导入:   POST /api/credentials/import/gpa');
+    log('  ', C.gray, 'GPA导出:   GET /api/credentials/export/gpa');
 
     logCollector.add('info', t('server.started', { host: host, port: port }));
 

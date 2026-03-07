@@ -483,6 +483,34 @@ var App = (function () {
       });
     }
 
+    var gpaImportFileInput = document.getElementById('gpaImportFileInput');
+    if (gpaImportFileInput) {
+      gpaImportFileInput.addEventListener('change', function () {
+        Accounts.onGpaFileSelection();
+      });
+    }
+
+    var btnGpaPreview = document.getElementById('btnGpaPreview');
+    if (btnGpaPreview) {
+      btnGpaPreview.addEventListener('click', function () {
+        Accounts.previewGpaImport();
+      });
+    }
+
+    var btnGpaImport = document.getElementById('btnGpaImport');
+    if (btnGpaImport) {
+      btnGpaImport.addEventListener('click', function () {
+        Accounts.importGpaCredentials();
+      });
+    }
+
+    var btnGpaExport = document.getElementById('btnGpaExport');
+    if (btnGpaExport) {
+      btnGpaExport.addEventListener('click', function () {
+        Accounts.exportGpaCredentials();
+      });
+    }
+
     // 刷新账号按钮
     var btnRefreshAccounts = document.getElementById('btnRefreshAccounts');
     if (btnRefreshAccounts) {

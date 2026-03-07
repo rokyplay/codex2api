@@ -322,6 +322,35 @@
           </div>
         </div>
 
+        <div class="card gpa-interop-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title" data-i18n="accounts.gpa_title">凭证导入/导出</div>
+              <div class="card-subtitle" data-i18n="accounts.gpa_desc">导入 GPA Codex 凭证，支持预览与导出</div>
+            </div>
+            <div class="gpa-interop-actions">
+              <button class="btn btn-secondary btn-sm" id="btnGpaPreview" data-i18n="accounts.gpa_preview">预览</button>
+              <button class="btn btn-primary btn-sm" id="btnGpaImport" data-i18n="accounts.gpa_import">导入</button>
+              <button class="btn btn-secondary btn-sm" id="btnGpaExport" data-i18n="accounts.gpa_export">导出 GPA 格式</button>
+            </div>
+          </div>
+          <div class="gpa-interop-grid">
+            <div class="gpa-interop-field">
+              <label class="login-label" for="gpaImportFileInput" data-i18n="accounts.gpa_file_label">上传 JSON 文件（可多选）</label>
+              <input id="gpaImportFileInput" class="input" type="file" accept=".json,application/json" multiple>
+              <p class="import-hint" id="gpaImportFileHint" data-i18n="accounts.gpa_file_hint">未选择文件时使用下方文本</p>
+            </div>
+            <div class="gpa-interop-field">
+              <label class="login-label" for="gpaImportTextarea" data-i18n="accounts.gpa_text_label">粘贴 JSON</label>
+              <textarea id="gpaImportTextarea" class="import-textarea" data-i18n-placeholder="accounts.gpa_text_placeholder"></textarea>
+            </div>
+          </div>
+          <div class="gpa-result-wrap">
+            <div class="card-subtitle" data-i18n="accounts.gpa_result_title">处理结果</div>
+            <pre id="gpaResultOutput" class="gpa-result-output">-</pre>
+          </div>
+        </div>
+
         <div class="stats-summary-bar accounts-lifespan-summary" id="accountsLifespanSummary"></div>
 
         <div class="table-wrapper">
@@ -414,17 +443,19 @@
               <table>
                 <thead>
                   <tr>
-                    <th data-i18n="abuse.th_identity">身份</th>
+                    <th data-i18n="abuse.col_seq_id">序号</th>
+                    <th data-i18n="abuse.col_username">用户名</th>
+                    <th data-i18n="abuse.col_requests">请求数</th>
+                    <th data-i18n="abuse.col_input_tokens">输入Token</th>
+                    <th data-i18n="abuse.col_output_tokens">输出Token</th>
+                    <th data-i18n="abuse.col_cached_tokens">缓存Token</th>
+                    <th data-i18n="abuse.col_last_active">最后活跃</th>
                     <th data-i18n="abuse.th_score">风险分</th>
-                    <th data-i18n="abuse.th_level">等级</th>
-                    <th data-i18n="abuse.th_action">动作</th>
-                    <th data-i18n="abuse.th_reasons">命中规则</th>
-                    <th data-i18n="abuse.th_time">最近评估</th>
                     <th data-i18n="abuse.th_actions">操作</th>
                   </tr>
                 </thead>
                 <tbody id="abuseUsersBody">
-                  <tr><td colspan="7"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
+                  <tr><td colspan="9"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
                 </tbody>
               </table>
             </div>

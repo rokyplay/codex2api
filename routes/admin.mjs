@@ -9,6 +9,8 @@
  *   GET    /admin/api/accounts/lifespan → 账号寿命统计
  *   POST   /admin/api/accounts/import   → 批量导入账号
  *   GET    /admin/api/accounts/export   → 导出账号（完整）
+ *   POST   /admin/api/credentials/import/gpa → GPA 凭证导入（管理会话）
+ *   GET    /admin/api/credentials/export/gpa  → GPA 凭证导出（管理会话）
  *   POST   /admin/api/accounts/:email/action → 账号操作
  *   DELETE /admin/api/accounts/:email   → 删除账号
  *   GET    /admin/api/config            → 配置信息（脱敏）
@@ -18,6 +20,7 @@
  *   PUT    /admin/api/rate-limits/user/:identity → 设置用户 RPM/TPM 覆盖
  *   DELETE /admin/api/rate-limits/user/:identity → 删除用户 RPM/TPM 覆盖
  *   GET    /admin/api/discord/users     → Discord 用户列表（支持 seq_id 搜索）
+ *   GET    /admin/api/abuse/user/:identity/history → 指定用户请求历史
  *   GET    /admin/api/logs              → 获取请求日志
  *   GET    /admin/api/logs/stats        → 日志统计
  *   DELETE /admin/api/logs              → 清空日志
@@ -57,6 +60,8 @@ import {
 var VERSION = '1.0.0';
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = dirname(__filename);
+var DISCORD_USERS_FILE = resolve(__dirname, '../data/discord-users.json');
+var STATS_DIR = resolve(__dirname, '../data/stats');
 
 // ============ Session 管理 ============
 
@@ -608,6 +613,55 @@ function requireAuth(req, config) {
   return { ok: true };
 }
 
+function isCredentialsApiTokenAuthorized(req, config) {
+  var apiToken = config && config.credentials && config.credentials.api_token;
+  if (!apiToken) {
+    return { ok: false, reason: 'not_configured' };
+  }
+  var token = extractBearerToken(req.headers['authorization'] || '');
+  if (!token || token !== apiToken) {
+    return { ok: false, reason: 'unauthorized' };
+  }
+  return { ok: true, mode: 'credentials_api_token' };
+}
+
+function requireCredentialsApiToken(req, res, config, t) {
+  var auth = isCredentialsApiTokenAuthorized(req, config);
+  if (auth.ok) return auth;
+  if (auth.reason === 'not_configured') {
+    logCollector.add('error', '凭证 API 未配置 api_token', {
+      operation: 'credentials_api_auth',
+      status: 'failed',
+      reason: 'not_configured',
+    });
+    jsonResponse(res, 503, { error: t('credentials.not_configured') });
+    return null;
+  }
+  logCollector.add('warn', '凭证 API 认证失败', {
+    operation: 'credentials_api_auth',
+    status: 'failed',
+    reason: 'unauthorized',
+  });
+  jsonResponse(res, 401, { error: t('credentials.unauthorized') });
+  return null;
+}
+
+function authorizeAdminSessionOrCredentialsToken(req, config) {
+  var token = extractBearerToken(req.headers['authorization'] || '');
+  if (!token) return { ok: false, reason: 'unauthorized' };
+
+  var credentialsToken = config && config.credentials && config.credentials.api_token;
+  if (credentialsToken && token === credentialsToken) {
+    return { ok: true, mode: 'credentials_api_token' };
+  }
+
+  if (isSessionValid(token, config)) {
+    return { ok: true, mode: 'admin_session' };
+  }
+
+  return { ok: false, reason: 'unauthorized' };
+}
+
 // ============ 辅助函数 ============
 
 /**
@@ -674,7 +728,7 @@ function _setAccountStatusWithTimestamp(account, status) {
 
 /**
  * 解析 URL 路径参数
- * /admin/api/accounts/user@example.com/action → "user@example.com"
+ * /admin/api/accounts/foo@bar.com/action → "foo@bar.com"
  */
 function extractEmailFromPath(path) {
   var match = path.match(/^\/admin\/api\/accounts\/([^/]+)\/action$/);
@@ -704,6 +758,12 @@ function extractApiKeyRotateIdFromPath(path) {
 
 function extractAbuseUserId(path) {
   var match = path.match(/^\/admin\/api\/abuse\/user\/([^/]+)$/);
+  if (match) return decodeURIComponent(match[1]);
+  return null;
+}
+
+function extractAbuseUserHistoryId(path) {
+  var match = path.match(/^\/admin\/api\/abuse\/user\/([^/]+)\/history$/);
   if (match) return decodeURIComponent(match[1]);
   return null;
 }
@@ -1014,6 +1074,22 @@ export function createAdminRoutes(ctx) {
       return handleExportAccounts(res, pool);
     }
 
+    // ====== POST /admin/api/credentials/import/gpa ======
+    if (method === 'POST' && path === '/admin/api/credentials/import/gpa') {
+      return await handleGpaCredentialsImport(req, res, ctx, {
+        enforceCredentialsToken: false,
+        authMode: 'admin_session',
+      });
+    }
+
+    // ====== GET /admin/api/credentials/export/gpa ======
+    if (method === 'GET' && path === '/admin/api/credentials/export/gpa') {
+      return await handleGpaCredentialsExport(req, res, ctx, {
+        skipAuthCheck: true,
+        authMode: 'admin_session',
+      });
+    }
+
 
     // ====== POST /admin/api/accounts/verify-batch ======
     if (method === 'POST' && path === '/admin/api/accounts/verify-batch') {
@@ -1158,6 +1234,10 @@ export function createAdminRoutes(ctx) {
     if (method === 'GET' && path === '/admin/api/abuse/users') {
       return handleAbuseUsers(req, res, ctx);
     }
+    var abuseUserHistoryId = extractAbuseUserHistoryId(path);
+    if (method === 'GET' && abuseUserHistoryId) {
+      return handleAbuseUserHistory(req, res, ctx, abuseUserHistoryId);
+    }
     var abuseUserId = extractAbuseUserId(path);
     if (method === 'GET' && abuseUserId) {
       return handleAbuseUserDetail(req, res, ctx, abuseUserId);
@@ -1280,7 +1360,7 @@ async function handleLogin(req, res, config, t) {
 
   var username = body.username || '';
   var password = body.password || '';
-  var expectedUsername = (config.server && config.server.admin_username) || 'rok';
+  var expectedUsername = (config.server && config.server.admin_username) || 'admin';
   var usernameMatch = safeCompare(username, expectedUsername);
   var totp = getTotpSettings(config);
 
@@ -1387,7 +1467,7 @@ async function handleTotpSetupInit(req, res, config, t) {
   }
 
   var totp = getTotpSettings(config);
-  var accountName = (config.server && config.server.admin_username) || 'rok';
+  var accountName = (config.server && config.server.admin_username) || 'admin';
   var secretBase32 = generateRandomBase32Secret(20);
   var otpauthUri = buildOtpAuthUri({
     secretBase32: secretBase32,
@@ -1617,6 +1697,435 @@ function handleExportAccounts(res, pool) {
     'Content-Disposition': 'attachment; filename="accounts-export.json"',
   });
   res.end(JSON.stringify(data, null, 2));
+}
+
+function parseRfc3339ToUnixSeconds(value) {
+  if (typeof value !== 'string' || !value.trim()) return 0;
+  var ts = Date.parse(value);
+  if (!isFinite(ts) || ts <= 0) return 0;
+  return Math.floor(ts / 1000);
+}
+
+function buildGpaExportFileName(email) {
+  var safeEmail = String(email || 'unknown').replace(/[^A-Za-z0-9@._+-]/g, '_');
+  return 'codex-' + safeEmail + '.json';
+}
+
+function createGpaRejectError(code, message) {
+  return {
+    code: String(code || 'invalid_credential'),
+    message: String(message || '凭证格式无效'),
+  };
+}
+
+function convertGpaCredential(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {
+      ok: false,
+      email: '',
+      warnings: [],
+      error: createGpaRejectError('invalid_credential_format', '凭证内容必须是 JSON 对象'),
+      converted: null,
+    };
+  }
+
+  var provider = String(raw.type || '').trim().toLowerCase();
+  if (provider !== 'codex') {
+    return {
+      ok: false,
+      email: String(raw.email || '').trim(),
+      warnings: [],
+      error: createGpaRejectError('unsupported_provider', '仅支持 type=codex 的 GPA 凭证'),
+      converted: null,
+    };
+  }
+
+  var email = String(raw.email || '').trim();
+  var accessToken = String(raw.access_token || raw.accessToken || '').trim();
+  if (!email || !accessToken) {
+    return {
+      ok: false,
+      email: email,
+      warnings: [],
+      error: createGpaRejectError('missing_required_fields', '缺少必填字段 email 或 access_token'),
+      converted: null,
+    };
+  }
+
+  var converted = {
+    email: email,
+    accessToken: accessToken,
+  };
+
+  var warnings = [];
+  var sessionToken = raw.session_token || raw.sessionToken || '';
+  if (sessionToken) {
+    converted.sessionToken = String(sessionToken);
+  } else {
+    warnings.push('missing_session_token: token refresh unavailable');
+  }
+
+  if (raw.cookies && typeof raw.cookies === 'object' && !Array.isArray(raw.cookies)) {
+    converted.cookies = raw.cookies;
+  }
+
+  if (typeof raw.password === 'string' && raw.password) {
+    converted.password = raw.password;
+  }
+
+  var tokenExpiresAt = parseRfc3339ToUnixSeconds(raw.expired);
+  if (tokenExpiresAt > 0) {
+    converted.token_expires_at = tokenExpiresAt;
+  }
+
+  return {
+    ok: true,
+    email: email,
+    warnings: warnings,
+    error: null,
+    converted: converted,
+  };
+}
+
+function normalizeGpaImportItems(body) {
+  var dryRun = false;
+  var items = [];
+
+  if (Array.isArray(body)) {
+    for (var i = 0; i < body.length; i++) {
+      items.push({ file: 'inline', raw: body[i] });
+    }
+    return { ok: true, dryRun: dryRun, items: items, error: null };
+  }
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return {
+      ok: false,
+      dryRun: false,
+      items: [],
+      error: createGpaRejectError('invalid_body', '请求体必须是数组或对象'),
+    };
+  }
+
+  dryRun = body.dryRun === true;
+
+  if (Array.isArray(body.files)) {
+    for (var f = 0; f < body.files.length; f++) {
+      var file = body.files[f];
+      if (!file || typeof file !== 'object' || Array.isArray(file)) {
+        items.push({ file: 'file-' + (f + 1), raw: null });
+        continue;
+      }
+      var fileName = String(file.name || ('file-' + (f + 1) + '.json'));
+      var content = file.content;
+      if (Array.isArray(content)) {
+        for (var j = 0; j < content.length; j++) {
+          items.push({ file: fileName, raw: content[j] });
+        }
+      } else {
+        items.push({ file: fileName, raw: content });
+      }
+    }
+    if (items.length === 0) {
+      return {
+        ok: false,
+        dryRun: dryRun,
+        items: [],
+        error: createGpaRejectError('empty_files', 'files 为空或未包含可导入凭证'),
+      };
+    }
+    return { ok: true, dryRun: dryRun, items: items, error: null };
+  }
+
+  if (body.content && (Array.isArray(body.content) || typeof body.content === 'object')) {
+    var contentSource = body.content;
+    if (Array.isArray(contentSource)) {
+      for (var c = 0; c < contentSource.length; c++) {
+        items.push({ file: String(body.name || 'inline'), raw: contentSource[c] });
+      }
+    } else {
+      items.push({ file: String(body.name || 'inline'), raw: contentSource });
+    }
+    return { ok: true, dryRun: dryRun, items: items, error: null };
+  }
+
+  if (body.type || body.email || body.access_token || body.accessToken) {
+    items.push({ file: 'inline', raw: body });
+    return { ok: true, dryRun: dryRun, items: items, error: null };
+  }
+
+  return {
+    ok: false,
+    dryRun: dryRun,
+    items: [],
+    error: createGpaRejectError('invalid_body', '请求体未包含 files 或 GPA 凭证数组'),
+  };
+}
+
+function toGpaImportErrorResponse(err) {
+  return {
+    code: err && err.code ? String(err.code) : 'import_failed',
+    message: err && err.message ? String(err.message) : '导入失败',
+  };
+}
+
+function logGpaImportDetail(level, meta) {
+  var email = String(meta && meta.email || '');
+  var status = String(meta && meta.status || '');
+  var reason = String(meta && meta.reason || '');
+  var message = 'GPA 凭证导入 [' + status + '] ' + (email || '(unknown)') + (reason ? (' - ' + reason) : '');
+  logCollector.add(level, message, meta || {});
+  if (level === 'error') {
+    log('❌', C.red, message);
+  } else if (level === 'warn') {
+    log('⚠️', C.yellow, message);
+  } else {
+    log('🧾', C.cyan, message);
+  }
+}
+
+async function handleGpaCredentialsImport(req, res, ctx, options) {
+  options = options || {};
+  var config = (ctx && ctx.config) || {};
+  var t = (ctx && ctx.t) || function (key) { return key; };
+  var pool = ctx && ctx.pool;
+  var authMode = String(options.authMode || '');
+
+  if (!pool || typeof pool.addAccount !== 'function') {
+    return jsonResponse(res, 500, { error: { code: 'pool_unavailable', message: '账号池不可用' } });
+  }
+
+  if (options.enforceCredentialsToken !== false) {
+    var tokenAuth = requireCredentialsApiToken(req, res, config, t);
+    if (!tokenAuth) return;
+    authMode = tokenAuth.mode;
+  }
+
+  var body;
+  try {
+    body = await readBody(req);
+  } catch (_) {
+    return jsonResponse(res, 400, { error: { code: 'invalid_body', message: t('credentials.invalid_body') } });
+  }
+
+  var normalized = normalizeGpaImportItems(body);
+  if (!normalized.ok) {
+    return jsonResponse(res, 400, { error: normalized.error || createGpaRejectError('invalid_body', t('credentials.invalid_body')) });
+  }
+
+  var dryRun = normalized.dryRun === true;
+  var items = normalized.items || [];
+
+  var imported = 0;
+  var updated = 0;
+  var rejected = 0;
+  var details = [];
+
+  var existing = {};
+  var currentAccounts = pool.listAccounts ? pool.listAccounts() : [];
+  for (var i = 0; i < currentAccounts.length; i++) {
+    var currentEmail = String(currentAccounts[i] && currentAccounts[i].email || '').trim();
+    if (currentEmail) existing[currentEmail] = true;
+  }
+
+  for (var j = 0; j < items.length; j++) {
+    var item = items[j] || {};
+    var converted = convertGpaCredential(item.raw);
+    if (!converted.ok) {
+      rejected++;
+      var rejectDetail = {
+        email: converted.email || '',
+        status: 'rejected',
+        error: toGpaImportErrorResponse(converted.error),
+      };
+      details.push(rejectDetail);
+      logGpaImportDetail('warn', {
+        operation: 'credentials_import_gpa',
+        auth_mode: authMode || '',
+        dry_run: dryRun,
+        file: String(item.file || ''),
+        email: rejectDetail.email,
+        status: 'rejected',
+        reason: rejectDetail.error.code,
+      });
+      continue;
+    }
+
+    var email = converted.email;
+    var willUpdate = !!existing[email];
+    var status = willUpdate ? 'updated' : 'imported';
+
+    if (!dryRun) {
+      try {
+        pool.addAccount(converted.converted);
+      } catch (err) {
+        rejected++;
+        var importError = toGpaImportErrorResponse({
+          code: 'import_failed',
+          message: (err && err.message) || '写入账号池失败',
+        });
+        details.push({
+          email: email,
+          status: 'rejected',
+          error: importError,
+        });
+        logGpaImportDetail('error', {
+          operation: 'credentials_import_gpa',
+          auth_mode: authMode || '',
+          dry_run: false,
+          file: String(item.file || ''),
+          email: email,
+          status: 'rejected',
+          reason: importError.message,
+        });
+        continue;
+      }
+    }
+
+    if (willUpdate) {
+      updated++;
+    } else {
+      imported++;
+      existing[email] = true;
+    }
+
+    var detail = {
+      email: email,
+      status: status,
+    };
+    if (converted.warnings && converted.warnings.length > 0) {
+      detail.warnings = converted.warnings.slice();
+    }
+    details.push(detail);
+    logGpaImportDetail(converted.warnings && converted.warnings.length > 0 ? 'warn' : 'info', {
+      operation: 'credentials_import_gpa',
+      auth_mode: authMode || '',
+      dry_run: dryRun,
+      file: String(item.file || ''),
+      email: email,
+      status: status,
+      reason: (converted.warnings && converted.warnings.join('; ')) || '',
+    });
+  }
+
+  logCollector.add('info', 'GPA 凭证导入完成', {
+    operation: 'credentials_import_gpa',
+    auth_mode: authMode || '',
+    dry_run: dryRun,
+    imported: imported,
+    updated: updated,
+    rejected: rejected,
+    total: items.length,
+  });
+
+  return jsonResponse(res, 200, {
+    imported: imported,
+    updated: updated,
+    rejected: rejected,
+    details: details,
+  });
+}
+
+async function handleGpaCredentialsExport(req, res, ctx, options) {
+  options = options || {};
+  var config = (ctx && ctx.config) || {};
+  var pool = ctx && ctx.pool;
+  var authMode = String(options.authMode || '');
+
+  if (!pool || typeof pool.listAccounts !== 'function' || typeof pool.getFullAccount !== 'function') {
+    return jsonResponse(res, 500, { error: { code: 'pool_unavailable', message: '账号池不可用' } });
+  }
+
+  if (options.skipAuthCheck !== true) {
+    var auth = authorizeAdminSessionOrCredentialsToken(req, config);
+    if (!auth.ok) {
+      logCollector.add('warn', 'GPA 凭证导出认证失败', {
+        operation: 'credentials_export_gpa',
+        status: 'failed',
+        reason: 'unauthorized',
+      });
+      return jsonResponse(res, 401, { error: { code: 'unauthorized', message: '凭证导出认证失败' } });
+    }
+    authMode = auth.mode;
+  }
+
+  var query = parseQuery(req.url || '');
+  var statusFilter = String(query.status || 'active').trim().toLowerCase() || 'active';
+  var list = pool.listAccounts();
+  var files = [];
+
+  for (var i = 0; i < list.length; i++) {
+    var account = list[i];
+    var status = String(account && account.status || '').toLowerCase();
+    if (statusFilter && status !== statusFilter) continue;
+
+    var full = pool.getFullAccount(account.email);
+    if (!full || !full.accessToken) {
+      logCollector.add('warn', 'GPA 凭证导出跳过（缺少 accessToken）', {
+        operation: 'credentials_export_gpa',
+        auth_mode: authMode || '',
+        status: 'skipped',
+        reason: 'missing_access_token',
+        email: String(account && account.email || ''),
+      });
+      continue;
+    }
+
+    var expiresAt = Number(full.token_expires_at || 0);
+    var expiredRfc3339 = '';
+    if (isFinite(expiresAt) && expiresAt > 0) {
+      expiredRfc3339 = new Date(expiresAt * 1000).toISOString();
+    }
+
+    var email = String(full.email || account.email || '').trim();
+    var content = {
+      type: 'codex',
+      email: email,
+      access_token: String(full.accessToken || ''),
+      account_id: String(full.accountId || ''),
+      expired: expiredRfc3339,
+    };
+
+    files.push({
+      name: buildGpaExportFileName(email),
+      content: content,
+    });
+
+    logCollector.add('info', 'GPA 凭证导出: ' + email, {
+      operation: 'credentials_export_gpa',
+      auth_mode: authMode || '',
+      status: 'exported',
+      reason: '',
+      email: email,
+      filter_status: statusFilter,
+    });
+  }
+
+  logCollector.add('info', 'GPA 凭证导出完成', {
+    operation: 'credentials_export_gpa',
+    auth_mode: authMode || '',
+    status: 'success',
+    reason: '',
+    count: files.length,
+    filter_status: statusFilter,
+  });
+
+  return jsonResponse(res, 200, {
+    count: files.length,
+    files: files,
+  });
+}
+
+export async function handleCredentialsImportGpaApi(req, res, ctx) {
+  return handleGpaCredentialsImport(req, res, ctx, {
+    enforceCredentialsToken: true,
+  });
+}
+
+export async function handleCredentialsExportGpaApi(req, res, ctx) {
+  return handleGpaCredentialsExport(req, res, ctx, {
+    skipAuthCheck: false,
+  });
 }
 
 function handleListApiKeys(res, config) {
@@ -2019,13 +2528,11 @@ function ensureProxyConfig(config) {
   } else {
     proxy.active_preset = String(proxy.active_preset);
   }
-  ensureRegisterProxyConfig(proxy);
+  ensureRegisterProxyConfig(proxy, config);
   return proxy;
 }
 
-var REGISTER_PROXY_SOCKS_HOST = '127.0.0.1';
-var REGISTER_PROXY_SOCKS_USERNAME = process.env.REGISTER_PROXY_SOCKS_USERNAME || '';
-var REGISTER_PROXY_SOCKS_PASSWORD = process.env.REGISTER_PROXY_SOCKS_PASSWORD || '';
+var REGISTER_PROXY_SOCKS_HOST = process.env.REGISTER_PROXY_HOST || '127.0.0.1';
 var REGISTER_PROXY_DEFAULT_PORT = 7860;
 var REGISTER_PROXY_PRESET_TARGET_MAP = {
   all: 'all',
@@ -2039,17 +2546,58 @@ var REGISTER_PROXY_PRESET_TARGET_MAP = {
   ikuuu: 'ikuuu',
   mojie: '魔戒',
 };
-var REGISTER_PROXY_DEFAULT_SERVER = buildRegisterPoolServerUrl('all');
 
-function buildRegisterSocksUrl(port) {
+function getRegisterProxyUsername(config) {
+  return (
+    (config && config.register_proxy && config.register_proxy.username) ||
+    process.env.REGISTER_PROXY_USERNAME ||
+    ''
+  );
+}
+
+function getRegisterProxyPassword(config) {
+  return (
+    (config && config.register_proxy && config.register_proxy.password) ||
+    process.env.REGISTER_PROXY_PASSWORD ||
+    ''
+  );
+}
+
+function maskProxySecret(value) {
+  var text = String(value || '');
+  if (!text) return '';
+  if (text.length <= 2) return text;
+  return text.slice(0, 2) + '***';
+}
+
+function maskRegisterSocksUrlForLog(url) {
+  var raw = String(url || '');
+  if (!raw) return raw;
+  try {
+    var parsed = new URL(raw);
+    if (!/^socks5h?:$/i.test(parsed.protocol)) {
+      return raw;
+    }
+    if (!parsed.password) {
+      return raw;
+    }
+    var masked = maskProxySecret(decodeURIComponent(parsed.password));
+    var username = parsed.username ? decodeURIComponent(parsed.username) : '';
+    var authPart = encodeURIComponent(username) + ':' + encodeURIComponent(masked) + '@';
+    return parsed.protocol + '//' + authPart + parsed.host;
+  } catch (_) {
+    return raw;
+  }
+}
+
+function buildRegisterSocksUrl(port, config) {
   var safePort = parseInt(port, 10);
   if (!safePort || safePort < 1 || safePort > 65535) safePort = REGISTER_PROXY_DEFAULT_PORT;
-  var authPart = '';
-  if (REGISTER_PROXY_SOCKS_USERNAME || REGISTER_PROXY_SOCKS_PASSWORD) {
-    authPart = encodeURIComponent(REGISTER_PROXY_SOCKS_USERNAME) + ':' +
-      encodeURIComponent(REGISTER_PROXY_SOCKS_PASSWORD) + '@';
-  }
-  return 'socks5://' + authPart + REGISTER_PROXY_SOCKS_HOST + ':' + safePort;
+  var username = getRegisterProxyUsername(config);
+  var password = getRegisterProxyPassword(config);
+  return 'socks5://' + encodeURIComponent(username) + ':' +
+    encodeURIComponent(password) + '@' +
+    REGISTER_PROXY_SOCKS_HOST + ':' + safePort;
 }
 
 function resolvePresetPort(proxy, presetKey) {
@@ -2084,24 +2632,24 @@ function findPresetKeyByMappedTarget(mappedTarget) {
   return '';
 }
 
-function buildRegisterPoolServerUrl(target, proxy) {
+function buildRegisterPoolServerUrl(target, proxy, config) {
   var safeTarget = target === undefined || target === null ? 'all' : String(target).trim();
   if (!safeTarget) safeTarget = 'all';
   if (proxy) {
     // 直接用 target 作为 preset key 查端口
     var presetPort = resolvePresetPort(proxy, safeTarget);
-    if (presetPort) return buildRegisterSocksUrl(presetPort);
+    if (presetPort) return buildRegisterSocksUrl(presetPort, config);
     // target 可能是映射后的值（如 'jp', 'eu', '自建', '魔戒'），反查 preset key
     var originalKey = findPresetKeyByMappedTarget(safeTarget);
     if (originalKey) {
       var mappedPort = resolvePresetPort(proxy, originalKey);
-      if (mappedPort) return buildRegisterSocksUrl(mappedPort);
+      if (mappedPort) return buildRegisterSocksUrl(mappedPort, config);
     }
     // 用节点名查端口
     var nodePort = resolveNodePort(proxy, safeTarget);
-    if (nodePort) return buildRegisterSocksUrl(nodePort);
+    if (nodePort) return buildRegisterSocksUrl(nodePort, config);
   }
-  return buildRegisterSocksUrl(REGISTER_PROXY_DEFAULT_PORT);
+  return buildRegisterSocksUrl(REGISTER_PROXY_DEFAULT_PORT, config);
 }
 
 function resolveRegisterPresetTarget(presetKey) {
@@ -2221,9 +2769,9 @@ function resolveRegisterProxyTarget(proxy, registerProxy) {
   return 'all';
 }
 
-function buildRegisterProxyForwardPayload(proxy, registerProxy) {
+function buildRegisterProxyForwardPayload(proxy, registerProxy, config) {
   var target = resolveRegisterProxyTarget(proxy, registerProxy);
-  var server = buildRegisterPoolServerUrl(target, proxy);
+  var server = buildRegisterPoolServerUrl(target, proxy, config);
   return {
     enabled: !!(registerProxy && registerProxy.enabled),
     server: server,
@@ -2232,7 +2780,7 @@ function buildRegisterProxyForwardPayload(proxy, registerProxy) {
   };
 }
 
-function ensureRegisterProxyConfig(proxy) {
+function ensureRegisterProxyConfig(proxy, config) {
   if (!proxy.register_proxy || typeof proxy.register_proxy !== 'object' || Array.isArray(proxy.register_proxy)) {
     proxy.register_proxy = {};
   }
@@ -2250,7 +2798,7 @@ function ensureRegisterProxyConfig(proxy) {
   // 否则迁移到 SOCKS5 URL
   var migrateTarget = resolveRegisterProxyTarget(proxy, registerProxy);
   if (!migrateTarget) migrateTarget = 'all';
-  registerProxy.server = buildRegisterPoolServerUrl(migrateTarget, proxy);
+  registerProxy.server = buildRegisterPoolServerUrl(migrateTarget, proxy, config);
   return registerProxy;
 }
 
@@ -2259,7 +2807,7 @@ function buildProxyServerUrl(proxy, port) {
   return 'socks5://' + host + ':' + port;
 }
 
-function formatProxyConfig(proxy) {
+function formatProxyConfig(proxy, config) {
   var registerProxy = ensureRegisterProxyConfigFromRegisterClient(proxy);
   var registerTarget = resolveRegisterProxyTarget(proxy, registerProxy);
   var registerLocalPort = 0;
@@ -2299,15 +2847,14 @@ function formatProxyConfig(proxy) {
     server: proxy.server || '',
     current_server: proxy.server || '',
     username: proxy.username || '',
-    password: '',
-    password_masked: proxy.password ? '***' : '',
+    password: proxy.password || '',
     active_preset: proxy.active_preset ? String(proxy.active_preset) : '',
     presets: proxy.presets || {},
     node_groups: proxy.node_groups || [],
     host: proxy.host || '127.0.0.1',
     register_proxy: {
       enabled: !!registerProxy.enabled,
-      server: registerProxy.server || buildRegisterSocksUrl(REGISTER_PROXY_DEFAULT_PORT),
+      server: registerProxy.server || buildRegisterSocksUrl(REGISTER_PROXY_DEFAULT_PORT, config),
       active_preset: registerProxy.active_preset ? String(registerProxy.active_preset) : '',
       target: registerTarget || '',
       local_port: registerLocalPort,
@@ -2317,7 +2864,7 @@ function formatProxyConfig(proxy) {
 
 function handleProxyPresets(res, config) {
   var proxy = ensureProxyConfigFromRegisterClient(config);
-  return jsonResponse(res, 200, formatProxyConfig(proxy));
+  return jsonResponse(res, 200, formatProxyConfig(proxy, config));
 }
 
 async function handleProxySelect(req, res, config, configPath) {
@@ -2399,7 +2946,7 @@ async function handleProxySelect(req, res, config, configPath) {
       if (!registerPresetPort || registerPresetPort < 1 || registerPresetPort > 65535) {
         return jsonResponse(res, 400, { error: 'Invalid register_proxy.preset port' });
       }
-      registerProxy.server = buildRegisterSocksUrl(registerPresetPort);
+      registerProxy.server = buildRegisterSocksUrl(registerPresetPort, config);
       registerProxy.active_preset = registerPresetKey;
       registerProxy.enabled = true;
       registerUpdated = true;
@@ -2412,7 +2959,7 @@ async function handleProxySelect(req, res, config, configPath) {
       if (!registerNodeTarget) {
         return jsonResponse(res, 400, { error: 'Invalid register_proxy.port target' });
       }
-      registerProxy.server = buildRegisterSocksUrl(registerPort);
+      registerProxy.server = buildRegisterSocksUrl(registerPort, config);
       registerProxy.active_preset = '';
       registerProxy.enabled = true;
       registerUpdated = true;
@@ -2485,7 +3032,7 @@ async function handleProxySelect(req, res, config, configPath) {
   }
 
   return jsonResponse(res, 200, {
-    proxy: formatProxyConfig(nextProxy),
+    proxy: formatProxyConfig(nextProxy, config),
     updated: {
       local_proxy: hasLocalUpdate,
       register_proxy: registerUpdated,
@@ -3362,6 +3909,134 @@ function normalizeDiscordUserForAdmin(raw) {
   };
 }
 
+function readDiscordUsersFile() {
+  if (!existsSync(DISCORD_USERS_FILE)) return {};
+  try {
+    var parsed = JSON.parse(readFileSync(DISCORD_USERS_FILE, 'utf8'));
+    var users = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed.users : null;
+    if (!users || typeof users !== 'object' || Array.isArray(users)) return {};
+    return users;
+  } catch (_) {
+    return {};
+  }
+}
+
+function buildDiscordAvatarUrl(discordUserId, avatar) {
+  var userId = String(discordUserId || '').trim();
+  var hash = String(avatar || '').trim();
+  if (!userId || !hash) return '';
+  if (/^https?:\/\//i.test(hash)) return hash;
+  return 'https://cdn.discordapp.com/avatars/' + userId + '/' + hash + '.png?size=64';
+}
+
+function normalizeIdentityForAdminSeq(value) {
+  var identity = String(value || '').trim();
+  if (!identity || identity === 'unknown') return '';
+  if (identity.indexOf('discord:') === 0) return '';
+  return identity;
+}
+
+function appendAdminIdentity(list, seen, identity) {
+  var normalized = normalizeIdentityForAdminSeq(identity);
+  if (!normalized || seen.has(normalized)) return;
+  seen.add(normalized);
+  list.push(normalized);
+}
+
+function buildAdminIdentityList(config, rows) {
+  var list = [];
+  var seen = new Set();
+  var serverCfg = (config && config.server) || {};
+
+  appendAdminIdentity(list, seen, serverCfg.default_identity);
+  appendAdminIdentity(list, seen, serverCfg.admin_username);
+
+  var arrayFields = [
+    serverCfg.whitelist,
+    serverCfg.whitelist_identities,
+    serverCfg.admin_users,
+    serverCfg.admin_identities,
+  ];
+  for (var i = 0; i < arrayFields.length; i++) {
+    var arr = arrayFields[i];
+    if (!Array.isArray(arr)) continue;
+    for (var j = 0; j < arr.length; j++) {
+      appendAdminIdentity(list, seen, arr[j]);
+    }
+  }
+
+  var apiKeys = Array.isArray(serverCfg.api_keys) ? serverCfg.api_keys : [];
+  for (var k = 0; k < apiKeys.length; k++) {
+    var apiKey = apiKeys[k] || {};
+    if (apiKey.enabled === false) continue;
+    appendAdminIdentity(list, seen, apiKey.identity);
+  }
+
+  var extra = [];
+  for (var n = 0; n < rows.length; n++) {
+    var identity = normalizeIdentityForAdminSeq(rows[n] && rows[n].caller_identity);
+    if (!identity || seen.has(identity)) continue;
+    extra.push(identity);
+  }
+  extra.sort();
+  for (var x = 0; x < extra.length; x++) {
+    appendAdminIdentity(list, seen, extra[x]);
+  }
+
+  return list;
+}
+
+function enrichAbuseUsersWithIdentityProfile(rows, config) {
+  var list = Array.isArray(rows) ? rows : [];
+  if (list.length === 0) return [];
+
+  var discordUsers = readDiscordUsersFile();
+  var adminIdentities = buildAdminIdentityList(config, list);
+  var adminSeqMap = new Map();
+  for (var i = 0; i < adminIdentities.length; i++) {
+    adminSeqMap.set(adminIdentities[i], 'admin_' + String(i + 1));
+  }
+
+  var enriched = [];
+  for (var j = 0; j < list.length; j++) {
+    var row = list[j] && typeof list[j] === 'object' ? Object.assign({}, list[j]) : {};
+    var identity = String(row.caller_identity || row.id || '').trim();
+    var discordUserId = '';
+    if (identity.indexOf('discord:') === 0) {
+      discordUserId = identity.slice('discord:'.length);
+    }
+
+    var profile = null;
+    if (discordUserId && discordUsers[discordUserId] && typeof discordUsers[discordUserId] === 'object') {
+      profile = discordUsers[discordUserId];
+    } else if (row.user && typeof row.user === 'object' && String(row.user.discord_user_id || '').trim()) {
+      profile = row.user;
+      discordUserId = String(row.user.discord_user_id || '').trim();
+    }
+
+    var seqId = '';
+    var discordUsername = '';
+    var discordDisplayName = '';
+    var avatarUrl = '';
+    if (profile) {
+      seqId = String(profile.seq_id || '').trim();
+      discordUsername = String(profile.username || '').trim();
+      discordDisplayName = String(profile.global_name || '').trim();
+      avatarUrl = buildDiscordAvatarUrl(discordUserId, profile.avatar);
+    } else {
+      seqId = adminSeqMap.get(identity) || '';
+      discordDisplayName = identity;
+    }
+
+    row.seq_id = seqId;
+    row.discord_username = discordUsername;
+    row.discord_display_name = discordDisplayName || discordUsername || identity;
+    row.avatar_url = avatarUrl;
+    enriched.push(row);
+  }
+  return enriched;
+}
+
 function handleDiscordUsers(req, res, ctx) {
   var userStore = resolveDiscordUserStore(ctx);
   if (!userStore || typeof userStore.listUsers !== 'function') {
@@ -3445,6 +4120,7 @@ function handleAbuseOverview(req, res, ctx) {
     return envelope(res, 200, true, {
       enabled: false,
       total_users: 0,
+      risk_users: 0,
       levels: { low: 0, medium: 0, high: 0, critical: 0 },
       actions: { observe: 0, throttle: 0, challenge: 0, suspend: 0 },
       today_events: 0,
@@ -3468,11 +4144,125 @@ function handleAbuseUsers(req, res, ctx) {
     sort: query.sort || 'score_desc',
     keyword: query.q || query.keyword || '',
   });
-  return envelope(res, 200, true, result.data || [], null, {
+  var rows = enrichAbuseUsersWithIdentityProfile(result.data || [], ctx && ctx.config ? ctx.config : null);
+  return envelope(res, 200, true, rows, null, {
     total: result.total || 0,
     page: result.page || 1,
     pages: result.pages || 1,
     limit: result.limit || 50,
+  });
+}
+
+function toFiniteNumber(value, fallback) {
+  var n = Number(value);
+  if (!isFinite(n)) return fallback || 0;
+  return n;
+}
+
+function parsePageLimit(value, fallback, minValue, maxValue) {
+  var n = parseInt(value, 10);
+  if (!isFinite(n)) return fallback;
+  if (n < minValue) return minValue;
+  if (n > maxValue) return maxValue;
+  return n;
+}
+
+function listRecentHistoryDates(days) {
+  var count = Math.max(1, Math.floor(toFiniteNumber(days, 3)));
+  var out = [];
+  var now = Date.now();
+  for (var i = 0; i < count; i++) {
+    out.push(_dateStrFromTs(now - i * 86400000));
+  }
+  return out;
+}
+
+function resolveHistoryDates(dateValue) {
+  var date = String(dateValue || '').trim();
+  if (_isValidDateStr(date)) return [date];
+  return listRecentHistoryDates(3);
+}
+
+function readAbuseUserHistory(identity, dates) {
+  var rows = [];
+  var dateList = Array.isArray(dates) ? dates : [];
+  for (var i = 0; i < dateList.length; i++) {
+    var date = String(dateList[i] || '').trim();
+    if (!_isValidDateStr(date)) continue;
+    var fp = resolve(STATS_DIR, 'requests-' + date + '.jsonl');
+    if (!existsSync(fp)) continue;
+
+    var content = '';
+    try {
+      content = readFileSync(fp, 'utf8');
+    } catch (_) {
+      continue;
+    }
+
+    var lines = content.split('\n');
+    for (var j = lines.length - 1; j >= 0; j--) {
+      var line = lines[j].trim();
+      if (!line) continue;
+      try {
+        var raw = JSON.parse(line);
+        var callerIdentity = String(raw.caller_identity || '').trim();
+        if (callerIdentity !== identity) continue;
+        var ts = Math.floor(toFiniteNumber(raw.ts, 0));
+        rows.push({
+          _ts: ts,
+          timestamp: ts > 0 ? new Date(ts).toISOString() : '',
+          model: String(raw.model || ''),
+          input_tokens: Math.max(0, Math.floor(toFiniteNumber(raw.input_tokens, 0))),
+          output_tokens: Math.max(0, Math.floor(toFiniteNumber(raw.output_tokens, 0))),
+          cached_tokens: Math.max(0, Math.floor(toFiniteNumber(raw.cached_tokens, 0))),
+          status_code: Math.floor(toFiniteNumber(raw.status, 0)),
+          latency_ms: Math.max(0, Math.floor(toFiniteNumber(raw.latency, 0))),
+          ip: String(raw.ip || ''),
+        });
+      } catch (_) {
+        // ignore broken line
+      }
+    }
+  }
+
+  rows.sort(function (a, b) {
+    return toFiniteNumber(b._ts, 0) - toFiniteNumber(a._ts, 0);
+  });
+  return rows;
+}
+
+function handleAbuseUserHistory(req, res, ctx, userId) {
+  var identityCheck = validateIdentityValue(userId);
+  if (!identityCheck.ok) {
+    return envelope(res, 400, false, null, { message: identityCheck.reason }, {});
+  }
+  var normalizedUserId = identityCheck.value;
+  var query = parseQuery(req.url);
+  var page = parsePageLimit(query.page, 1, 1, 1000000);
+  var limit = parsePageLimit(query.limit, 20, 1, 200);
+  var date = String(query.date || '').trim();
+  var dates = resolveHistoryDates(date);
+
+  var allRows = readAbuseUserHistory(normalizedUserId, dates);
+  var total = allRows.length;
+  var pages = Math.max(1, Math.ceil(total / limit));
+  if (page > pages) page = pages;
+  var start = (page - 1) * limit;
+  var pageRows = allRows.slice(start, start + limit);
+  var data = [];
+  for (var i = 0; i < pageRows.length; i++) {
+    var row = Object.assign({}, pageRows[i]);
+    delete row._ts;
+    data.push(row);
+  }
+
+  return envelope(res, 200, true, data, null, {
+    total: total,
+    page: page,
+    pages: pages,
+    limit: limit,
+    date: _isValidDateStr(date) ? date : '',
+    days: _isValidDateStr(date) ? 1 : 3,
   });
 }
 
@@ -3908,9 +4698,10 @@ async function handleRegisterProxy(req, res, config, path, method) {
     if (!statusPayload.proxy || typeof statusPayload.proxy !== 'object' || typeof statusPayload.proxy.enabled !== 'boolean') {
       var localProxyForStatus = ensureProxyConfigFromRegisterClient(config);
       var localRegisterProxyForStatus = ensureRegisterProxyConfigFromRegisterClient(localProxyForStatus);
+      var defaultRegisterServerForStatus = buildRegisterPoolServerUrl('all', localProxyForStatus, config);
       statusPayload.proxy = {
         enabled: !!localRegisterProxyForStatus.enabled,
-        server: localRegisterProxyForStatus.server || REGISTER_PROXY_DEFAULT_SERVER,
+        server: localRegisterProxyForStatus.server || defaultRegisterServerForStatus,
         active_preset: localRegisterProxyForStatus.active_preset ? String(localRegisterProxyForStatus.active_preset) : '',
       };
     }
@@ -4001,9 +4792,10 @@ async function handleRegisterProxy(req, res, config, path, method) {
           if (!statusPayload.proxy || typeof statusPayload.proxy !== 'object' || typeof statusPayload.proxy.enabled !== 'boolean') {
             var localProxy = ensureProxyConfigFromRegisterClient(config);
             var localRegisterProxy = ensureRegisterProxyConfigFromRegisterClient(localProxy);
+            var defaultRegisterServer = buildRegisterPoolServerUrl('all', localProxy, config);
             statusPayload.proxy = {
               enabled: !!localRegisterProxy.enabled,
-              server: localRegisterProxy.server || REGISTER_PROXY_DEFAULT_SERVER,
+              server: localRegisterProxy.server || defaultRegisterServer,
               active_preset: localRegisterProxy.active_preset ? String(localRegisterProxy.active_preset) : '',
             };
             responseBody = JSON.stringify(statusPayload);
@@ -4018,9 +4810,10 @@ async function handleRegisterProxy(req, res, config, path, method) {
     res.end(responseBody);
 
   } catch (err) {
-    log('❌', C.red, 'Register proxy error: ' + (err.message || String(err)));
+    var safeError = maskRegisterSocksUrlForLog(err && err.message ? err.message : String(err));
+    log('❌', C.red, 'Register proxy error: ' + safeError);
     return jsonResponse(res, 502, {
-      error: 'Cannot reach registration server: ' + (err.message || String(err)),
+      error: 'Cannot reach registration server: ' + safeError,
     });
   }
 }

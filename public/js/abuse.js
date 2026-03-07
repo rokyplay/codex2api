@@ -15,6 +15,10 @@ var Abuse = (function () {
     sort: 'score_desc',
     keyword: '',
   };
+  var _lastUsers = [];
+  var _lastUsersMeta = {};
+  var _expandedHistories = {};
+  var _historyState = {};
 
   function _getData(resp) {
     if (!resp || typeof resp !== 'object') return null;
@@ -51,6 +55,107 @@ var Abuse = (function () {
     return 'stats-badge-success';
   }
 
+  function _safeInt(value) {
+    var n = Number(value);
+    if (!isFinite(n)) return 0;
+    return Math.max(0, Math.floor(n));
+  }
+
+  function _formatCompactNumber(value) {
+    var n = _safeInt(value);
+    if (n >= 1000000) {
+      return (Math.round(n / 100000) / 10).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    if (n >= 1000) {
+      return (Math.round(n / 100) / 10).toFixed(1).replace(/\.0$/, '') + 'K';
+    }
+    return String(n);
+  }
+
+  function _formatDateTimeValue(value) {
+    if (value === null || value === undefined || value === '') return '-';
+    var n = Number(value);
+    if (isFinite(n) && n > 0) {
+      return formatDateTime(new Date(n).toISOString());
+    }
+    return formatDateTime(value);
+  }
+
+  function _isHistoryExpanded(identity) {
+    return !!_expandedHistories[String(identity || '')];
+  }
+
+  function _ensureHistory(identity) {
+    var key = String(identity || '');
+    if (!key) return null;
+    if (!_historyState[key]) {
+      _historyState[key] = {
+        data: [],
+        page: 0,
+        pages: 1,
+        limit: 20,
+        loading: false,
+      };
+    }
+    return _historyState[key];
+  }
+
+  function _renderHistorySection(identity) {
+    var state = _ensureHistory(identity);
+    if (!state) return '';
+
+    var html = '<div class="abuse-history-section">'
+      + '<div class="abuse-history-title">' + escapeHtml(t('abuse.history_title')) + '</div>';
+
+    if (state.loading && state.data.length === 0) {
+      html += '<div class="loading-spinner"><div class="spinner"></div></div></div>';
+      return html;
+    }
+
+    if (!state.data.length) {
+      html += '<div class="empty-state"><span>' + escapeHtml(t('abuse.no_history')) + '</span></div></div>';
+      return html;
+    }
+
+    html += '<div class="table-wrapper"><div class="table-scroll"><table><thead><tr>'
+      + '<th>' + escapeHtml(t('abuse.col_time')) + '</th>'
+      + '<th>' + escapeHtml(t('abuse.col_model')) + '</th>'
+      + '<th>' + escapeHtml(t('abuse.col_input_tokens')) + '</th>'
+      + '<th>' + escapeHtml(t('abuse.col_output_tokens')) + '</th>'
+      + '<th>' + escapeHtml(t('abuse.col_cached_tokens')) + '</th>'
+      + '<th>' + escapeHtml(t('abuse.col_status')) + '</th>'
+      + '<th>' + escapeHtml(t('abuse.col_latency')) + '</th>'
+      + '<th>' + escapeHtml(t('abuse.col_ip')) + '</th>'
+      + '</tr></thead><tbody>';
+
+    for (var i = 0; i < state.data.length; i++) {
+      var item = state.data[i] || {};
+      html += '<tr>'
+        + '<td class="td-mono">' + escapeHtml(_formatDateTimeValue(item.timestamp || '')) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(String(item.model || '-')) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(item.input_tokens || 0)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(item.output_tokens || 0)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(item.cached_tokens || 0)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(String(item.status_code || 0)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(String(_safeInt(item.latency_ms || 0))) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(String(item.ip || '-')) + '</td>'
+        + '</tr>';
+    }
+    html += '</tbody></table></div></div>';
+
+    var hasMore = state.page < state.pages;
+    if (hasMore) {
+      html += '<div class="abuse-history-actions">'
+        + '<button class="btn btn-secondary btn-sm abuse-history-load-btn" data-identity="' + escapeHtml(identity) + '">' + escapeHtml(t('abuse.load_more')) + '</button>'
+        + '</div>';
+    }
+    if (state.loading && state.data.length > 0) {
+      html += '<div class="loading-spinner"><div class="spinner"></div></div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
   function _renderOverview(overview) {
     var container = document.getElementById('abuseOverviewCards');
     if (!container) return;
@@ -63,6 +168,12 @@ var Abuse = (function () {
         value: overview.total_users || 0,
         cls: 'hero-info',
         icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
+      },
+      {
+        label: t('abuse.card_risk_users'),
+        value: overview.risk_users || 0,
+        cls: 'hero-warning',
+        icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 11h4"/><path d="M19 9v4"/></svg>',
       },
       {
         label: t('abuse.card_critical_users'),
@@ -99,10 +210,12 @@ var Abuse = (function () {
   }
 
   function _renderUsers(users, meta) {
+    _lastUsers = Array.isArray(users) ? users.slice() : [];
+    _lastUsersMeta = meta || {};
     var body = document.getElementById('abuseUsersBody');
     if (!body) return;
     if (!Array.isArray(users) || users.length === 0) {
-      body.innerHTML = '<tr><td colspan="7"><div class="empty-state"><span>' + escapeHtml(t('abuse.users_empty')) + '</span></div></td></tr>';
+      body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><span>' + escapeHtml(t('abuse.users_empty')) + '</span></div></td></tr>';
       return;
     }
     var html = '';
@@ -110,23 +223,41 @@ var Abuse = (function () {
       var row = users[i] || {};
       var user = row.user || null;
       var identity = String(row.caller_identity || row.id || '');
-      var score = Number(row.score || 0);
-      var level = String(row.level || 'low');
-      var action = String(row.action || 'observe');
-      var reasonCount = Number(row.reasons_count || 0);
-      var displayName = identity;
-      if (user && (user.global_name || user.username)) {
-        displayName = (user.global_name || user.username) + ' (' + identity + ')';
+      var score = _safeInt(row.score || 0);
+      var seqId = String(row.seq_id || '').trim() || '-';
+      var displayName = String(row.discord_display_name || '').trim();
+      if (!displayName && user && (user.global_name || user.username)) {
+        displayName = String(user.global_name || user.username || '').trim();
       }
-      html += '<tr>'
-        + '<td class="td-mono td-email" title="' + escapeHtml(identity) + '">' + escapeHtml(displayName) + '</td>'
+      if (!displayName) displayName = identity || '-';
+      var usernameHover = String(row.discord_username || '').trim();
+      if (!usernameHover && user && user.username) usernameHover = String(user.username || '').trim();
+      var requests = _safeInt(row.requests || 0);
+      var inputTokens = _safeInt(row.input_tokens || 0);
+      var outputTokens = _safeInt(row.output_tokens || 0);
+      var cachedTokens = _safeInt(row.cached_tokens || 0);
+      var lastActive = row.last_seen || row.last_eval_at || row.updated_at || '';
+
+      html += '<tr class="abuse-user-row" data-identity="' + escapeHtml(identity) + '">'
+        + '<td class="td-mono">' + escapeHtml(seqId) + '</td>'
+        + '<td class="td-email" title="' + escapeHtml(usernameHover || identity) + '">'
+        + '<span class="abuse-user-name">' + escapeHtml(displayName) + '</span>'
+        + (usernameHover ? '<span class="abuse-user-sub">@' + escapeHtml(usernameHover) + '</span>' : '')
+        + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(requests)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(inputTokens)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(outputTokens)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatCompactNumber(cachedTokens)) + '</td>'
+        + '<td class="td-mono">' + escapeHtml(_formatDateTimeValue(lastActive)) + '</td>'
         + '<td class="td-mono">' + escapeHtml(String(score)) + '</td>'
-        + '<td><span class="stats-badge ' + _badgeClassByLevel(level) + '">' + escapeHtml(_levelLabel(level)) + '</span></td>'
-        + '<td><span class="stats-badge ' + _badgeClassByAction(action) + '">' + escapeHtml(_actionLabel(action)) + '</span></td>'
-        + '<td class="td-mono">' + escapeHtml(String(reasonCount)) + '</td>'
-        + '<td class="td-mono">' + escapeHtml(formatDateTime(row.last_eval_at || row.updated_at || '')) + '</td>'
         + '<td><button class="btn btn-secondary btn-sm abuse-detail-btn" data-identity="' + escapeHtml(identity) + '">' + escapeHtml(t('abuse.view_detail')) + '</button></td>'
         + '</tr>';
+
+      if (_isHistoryExpanded(identity)) {
+        html += '<tr class="abuse-history-row"><td colspan="9">'
+          + _renderHistorySection(identity)
+          + '</td></tr>';
+      }
     }
     body.innerHTML = html;
 
@@ -227,6 +358,49 @@ var Abuse = (function () {
       }
       timeline.innerHTML = timelineHtml;
     }
+  }
+
+  function _loadUserHistory(identity, reset) {
+    var key = String(identity || '');
+    if (!key) return Promise.resolve();
+    var state = _ensureHistory(key);
+    if (!state) return Promise.resolve();
+    if (state.loading) return Promise.resolve();
+
+    var isReset = reset !== false;
+    var nextPage = isReset ? 1 : (state.page + 1);
+    if (!isReset && state.page >= state.pages) return Promise.resolve();
+
+    state.loading = true;
+    if (isReset) {
+      state.data = [];
+      state.page = 0;
+      state.pages = 1;
+    }
+    _renderUsers(_lastUsers, _lastUsersMeta);
+
+    var params = 'page=' + encodeURIComponent(String(nextPage)) + '&limit=' + encodeURIComponent(String(state.limit || 20));
+    return api('GET', '/abuse/user/' + encodeURIComponent(key) + '/history?' + params)
+      .then(function (resp) {
+        var rows = _getData(resp);
+        var meta = _getMeta(resp, {});
+        var list = Array.isArray(rows) ? rows : [];
+        if (isReset) {
+          state.data = list;
+        } else {
+          state.data = state.data.concat(list);
+        }
+        state.page = Number(meta.page || nextPage) || nextPage;
+        state.pages = Number(meta.pages || state.page) || state.page;
+        state.limit = Number(meta.limit || state.limit || 20) || 20;
+      })
+      .catch(function (err) {
+        toast(t('abuse.load_failed') + ': ' + err.message, 'error');
+      })
+      .finally(function () {
+        state.loading = false;
+        _renderUsers(_lastUsers, _lastUsersMeta);
+      });
   }
 
   function _loadOverview() {
@@ -408,10 +582,29 @@ var Abuse = (function () {
     var usersBody = document.getElementById('abuseUsersBody');
     if (usersBody) {
       usersBody.addEventListener('click', function (e) {
+        var loadMoreBtn = e.target.closest('.abuse-history-load-btn');
+        if (loadMoreBtn) {
+          var loadIdentity = loadMoreBtn.getAttribute('data-identity') || '';
+          _loadUserHistory(loadIdentity, false);
+          return;
+        }
+
         var btn = e.target.closest('.abuse-detail-btn');
-        if (!btn) return;
-        var identity = btn.getAttribute('data-identity') || '';
-        _loadDetail(identity);
+        if (btn) {
+          var identity = btn.getAttribute('data-identity') || '';
+          _loadDetail(identity);
+          return;
+        }
+
+        var row = e.target.closest('.abuse-user-row');
+        if (!row) return;
+        var rowIdentity = row.getAttribute('data-identity') || '';
+        if (!rowIdentity) return;
+        _expandedHistories[rowIdentity] = !_isHistoryExpanded(rowIdentity);
+        _renderUsers(_lastUsers, _lastUsersMeta);
+        if (_isHistoryExpanded(rowIdentity)) {
+          _loadUserHistory(rowIdentity, true);
+        }
       });
     }
 

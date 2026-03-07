@@ -10,6 +10,7 @@ var Accounts = (function () {
   var _lifespanStats = null;
   var _currentFilter = 'all';
   var _searchTerm = '';
+  var _gpaBusy = false;
 
   /**
    * 状态徽章 class
@@ -356,6 +357,158 @@ var Accounts = (function () {
       });
   }
 
+  function _setGpaResult(data) {
+    var output = document.getElementById('gpaResultOutput');
+    if (!output) return;
+    try {
+      output.textContent = JSON.stringify(data, null, 2);
+    } catch (_) {
+      output.textContent = String(data || '-');
+    }
+  }
+
+  function _setGpaBusyState(busy) {
+    _gpaBusy = busy === true;
+    var ids = ['btnGpaPreview', 'btnGpaImport', 'btnGpaExport'];
+    for (var i = 0; i < ids.length; i++) {
+      var btn = document.getElementById(ids[i]);
+      if (btn) btn.disabled = _gpaBusy;
+    }
+  }
+
+  function _readFileAsText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        resolve(String((ev && ev.target && ev.target.result) || ''));
+      };
+      reader.onerror = function () {
+        reject(new Error((file && file.name ? file.name + ': ' : '') + t('accounts.gpa_file_read_failed')));
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  function _buildGpaImportPayload(dryRun) {
+    var fileInput = document.getElementById('gpaImportFileInput');
+    var files = fileInput && fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
+    if (files.length > 0) {
+      var tasks = files.map(function (file) {
+        return _readFileAsText(file).then(function (text) {
+          try {
+            var parsed = JSON.parse(text);
+            return { name: file.name || 'credential.json', content: parsed };
+          } catch (e) {
+            throw new Error((file && file.name ? file.name + ': ' : '') + t('accounts.import_json_error') + ': ' + e.message);
+          }
+        });
+      });
+      return Promise.all(tasks).then(function (parsedFiles) {
+        return {
+          dryRun: dryRun === true,
+          files: parsedFiles,
+        };
+      });
+    }
+
+    var textarea = document.getElementById('gpaImportTextarea');
+    var text = textarea ? String(textarea.value || '').trim() : '';
+    if (!text) {
+      return Promise.reject(new Error(t('accounts.gpa_import_empty')));
+    }
+
+    var parsedText;
+    try {
+      parsedText = JSON.parse(text);
+    } catch (e2) {
+      return Promise.reject(new Error(t('accounts.import_json_error') + ': ' + e2.message));
+    }
+
+    if (parsedText && typeof parsedText === 'object' && !Array.isArray(parsedText) && Array.isArray(parsedText.files)) {
+      var passthrough = Object.assign({}, parsedText);
+      passthrough.dryRun = dryRun === true;
+      return Promise.resolve(passthrough);
+    }
+
+    return Promise.resolve({
+      dryRun: dryRun === true,
+      files: [{ name: 'pasted.json', content: parsedText }],
+    });
+  }
+
+  function _importGpaByDryRun(dryRun) {
+    if (_gpaBusy) return;
+    _setGpaBusyState(true);
+    _buildGpaImportPayload(dryRun)
+      .then(function (payload) {
+        return api('POST', '/credentials/import/gpa', payload);
+      })
+      .then(function (result) {
+        _setGpaResult(result);
+        if (dryRun) {
+          toast(t('accounts.gpa_preview_success'), 'success');
+        } else {
+          toast(t('accounts.gpa_import_done', {
+            imported: result.imported || 0,
+            updated: result.updated || 0,
+            rejected: result.rejected || 0,
+          }), (result.rejected || 0) > 0 ? 'warning' : 'success');
+          load();
+        }
+      })
+      .catch(function (err) {
+        toast((dryRun ? t('accounts.gpa_preview_failed') : t('accounts.gpa_import_failed')) + ': ' + err.message, 'error');
+      })
+      .finally(function () {
+        _setGpaBusyState(false);
+      });
+  }
+
+  function previewGpaImport() {
+    _importGpaByDryRun(true);
+  }
+
+  function importGpaCredentials() {
+    _importGpaByDryRun(false);
+  }
+
+  function exportGpaCredentials() {
+    if (_gpaBusy) return;
+    _setGpaBusyState(true);
+    api('GET', '/credentials/export/gpa?status=active')
+      .then(function (result) {
+        _setGpaResult(result);
+        var blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'gpa-credentials-export.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast(t('accounts.gpa_export_success', { count: result.count || 0 }), 'success');
+      })
+      .catch(function (err) {
+        toast(t('accounts.gpa_export_failed') + ': ' + err.message, 'error');
+      })
+      .finally(function () {
+        _setGpaBusyState(false);
+      });
+  }
+
+  function onGpaFileSelection() {
+    var hint = document.getElementById('gpaImportFileHint');
+    var fileInput = document.getElementById('gpaImportFileInput');
+    if (!hint) return;
+    var count = (fileInput && fileInput.files && fileInput.files.length) ? fileInput.files.length : 0;
+    if (count <= 0) {
+      hint.textContent = t('accounts.gpa_file_hint');
+    } else {
+      hint.textContent = t('accounts.gpa_file_selected', { count: count });
+    }
+  }
+
   /**
    * 浏览器登录添加账号
    */
@@ -520,6 +673,10 @@ var Accounts = (function () {
     handleAction: handleAction,
     importAccounts: importAccounts,
     exportAccounts: exportAccounts,
+    previewGpaImport: previewGpaImport,
+    importGpaCredentials: importGpaCredentials,
+    exportGpaCredentials: exportGpaCredentials,
+    onGpaFileSelection: onGpaFileSelection,
     browserLogin: browserLogin,
     verifyBatch: verifyBatch,
     getCurrentFilter: getCurrentFilter,
