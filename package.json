@@ -1,0 +1,20 @@
+{
+  "name": "codex2api",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Proxy server converting OpenAI Chat/Anthropic/Gemini API to Codex Responses API",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "nodemailer": "^8.0.1",
+    "playwright": "^1.58.2",
+    "rebrowser-patches": "^1.0.19",
+    "rebrowser-playwright": "^1.52.0"
+  },
+  "optionalDependencies": {
+    "capsolver-npm": "^1.0.0"
+  }
+}

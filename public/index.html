@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>codex2api</title>
+  <link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+
+<!-- ============ 登录页 ============ -->
+<div id="loginPage" class="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-icon">C</div>
+      <h1 class="login-title" data-i18n="login.title">codex2api</h1>
+      <p class="login-subtitle" data-i18n="login.subtitle">管理面板</p>
+    </div>
+    <form id="loginForm" class="login-form" autocomplete="off">
+      <div id="loginError" class="login-error"></div>
+      <div class="login-field">
+        <label class="login-label" for="loginUser" data-i18n="login.username">用户名</label>
+        <input id="loginUser" class="input" type="text" data-i18n-placeholder="login.username_placeholder" autocomplete="username">
+      </div>
+      <div class="login-field" id="loginPassWrap">
+        <label class="login-label" for="loginPass" data-i18n="login.password">密码</label>
+        <input id="loginPass" class="input" type="password" data-i18n-placeholder="login.password_placeholder" autocomplete="current-password">
+      </div>
+      <div class="login-field hidden" id="loginModeWrap">
+        <label class="login-label" for="loginMode" data-i18n="login.mode">登录模式</label>
+        <select id="loginMode" class="input login-mode-select">
+          <option value="password_totp" data-i18n="login.mode_password_totp">密码 + TOTP</option>
+          <option value="totp_only" id="loginModeTotpOnly" data-i18n="login.mode_totp_only">仅 TOTP</option>
+        </select>
+      </div>
+      <div class="login-field hidden" id="loginTotpWrap">
+        <label class="login-label" for="loginTotp" data-i18n="login.totp_code">TOTP 验证码</label>
+        <input id="loginTotp" class="input" type="text" inputmode="numeric" maxlength="6" data-i18n-placeholder="login.totp_placeholder" autocomplete="one-time-code">
+      </div>
+      <button type="submit" class="btn btn-primary login-btn" id="loginBtn" data-i18n="login.submit">登 录</button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ 主面板 ============ -->
+<div id="appLayout" class="app-layout hidden">
+
+  <!-- 移动端遮罩 -->
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+  <!-- 侧边栏 -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">C</div>
+      <span class="sidebar-brand">codex2api</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+          </svg>
+        </span>
+        <span data-i18n="nav.dashboard">仪表盘</span>
+      </div>
+      <div class="nav-item" data-page="accounts">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </span>
+        <span data-i18n="nav.accounts">账号管理</span>
+      </div>
+      <div class="nav-item" data-page="statistics">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+        </span>
+        <span data-i18n="nav.statistics">统计</span>
+      </div>
+      <div class="nav-item" data-page="logs">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </span>
+        <span data-i18n="nav.logs">日志</span>
+      </div>
+      <div class="nav-item" data-page="abuse">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4z"></path>
+            <path d="M9 12l2 2 4-4"></path>
+          </svg>
+        </span>
+        <span data-i18n="nav.abuse">风控</span>
+      </div>
+      <div class="nav-item" data-page="registration">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <line x1="19" y1="8" x2="19" y2="14"></line>
+            <line x1="22" y1="11" x2="16" y2="11"></line>
+          </svg>
+        </span>
+        <span data-i18n="nav.registration">注册</span>
+      </div>
+      <div class="nav-item" data-page="config">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </span>
+        <span data-i18n="nav.config">配置</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-version" data-i18n="common.version_label">codex2api</div>
+    </div>
+  </aside>
+
+  <!-- 主内容 -->
+  <div class="main-area">
+    <!-- 顶栏 -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="menuToggle" class="menu-toggle">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <h2 id="pageTitle" class="topbar-title" data-i18n="nav.dashboard">仪表盘</h2>
+      </div>
+      <div class="topbar-right">
+        <button id="emailToggleBtn" class="icon-btn" title="显示邮箱">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+        <div class="date-picker-wrapper" id="datePickerWrapper">
+          <button id="datePickerBtn" class="date-picker-btn" title="Date Range">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span id="datePickerLabel">今天</span>
+          </button>
+          <div class="date-picker-dropdown" id="datePickerDropdown">
+            <div class="dp-presets">
+              <button class="dp-preset-btn" data-preset="last1h" data-i18n="date.last1h">近1小时</button>
+              <button class="dp-preset-btn" data-preset="last3h" data-i18n="date.last3h">近3小时</button>
+              <button class="dp-preset-btn" data-preset="last6h" data-i18n="date.last6h">近6小时</button>
+              <button class="dp-preset-btn" data-preset="last12h" data-i18n="date.last12h">近12小时</button>
+              <button class="dp-preset-btn" data-preset="today" data-i18n="stats.today">今天</button>
+              <button class="dp-preset-btn" data-preset="yesterday" data-i18n="stats.yesterday">昨天</button>
+              <button class="dp-preset-btn" data-preset="last7" data-i18n="stats.last_7_days">7天</button>
+              <button class="dp-preset-btn" data-preset="last30" data-i18n="stats.last_30_days">30天</button>
+              <button class="dp-preset-btn" data-preset="total" data-i18n="stats.total">总计</button>
+            </div>
+            <div class="dp-custom">
+              <div class="dp-input-row">
+                <label for="dpFromInput" data-i18n="datepicker.from">开始日期</label>
+                <input id="dpFromInput" type="date">
+              </div>
+              <div class="dp-input-row">
+                <label for="dpToInput" data-i18n="datepicker.to">结束日期</label>
+                <input id="dpToInput" type="date">
+              </div>
+              <button id="dpApplyBtn" class="btn btn-primary btn-sm" data-i18n="datepicker.apply">应用</button>
+            </div>
+          </div>
+        </div>
+        <button id="langToggle" class="icon-btn" title="Language">
+          <span id="langLabel">中</span>
+        </button>
+        <button id="themeToggle" class="theme-toggle" data-i18n-title="theme.toggle" title="切换主题">
+          <svg class="theme-icon-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg class="theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+        <div id="healthStatus" class="health-dot health-checking" data-i18n-title="dashboard.health_checking"></div>
+        <span class="topbar-user" id="topbarUser"></span>
+        <button id="logoutBtn" class="btn-logout" data-i18n="common.logout">退出登录</button>
+      </div>
+    </header>
+
+    <!-- 内容区 -->
+    <main class="content">
+
+      <!-- ======== 仪表盘页 ======== -->
+      <div id="pageDashboard" class="page active">
+        <!-- 核心指标 -->
+        <div class="hero-stats" id="heroStats"></div>
+
+        <!-- 账号健康横条 -->
+        <div class="account-health-bar" id="accountHealthBar"></div>
+
+        <div class="card" id="analyticsCard" style="margin-top:16px;">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+            <div class="card-title" data-i18n="dashboard.analytics_title">数据分析</div>
+            <div class="analytics-tabs" id="analyticsTabs">
+              <button class="analytics-tab active" data-tab="token" data-i18n="dashboard.tab_token_trend">Token趋势</button>
+              <button class="analytics-tab" data-tab="request" data-i18n="dashboard.tab_request_trend">请求趋势</button>
+              <button class="analytics-tab" data-tab="model" data-i18n="dashboard.tab_model_rank">模型排行</button>
+              <button class="analytics-tab" data-tab="account" data-i18n="dashboard.tab_account_rank">账号排行</button>
+              <button class="analytics-tab" data-tab="caller" data-i18n="dashboard.tab_caller_rank">调用者排行</button>
+            </div>
+          </div>
+          <div id="analyticsContent" class="analytics-content"></div>
+        </div>
+
+        <!-- 更多信息（折叠） -->
+        <details class="dashboard-details" id="dashboardDetails">
+          <summary class="dashboard-details-summary">
+            <span data-i18n="dashboard.more_info">更多信息</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="dashboard-grid">
+            <div class="card card-compact">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" data-i18n="dashboard.models_title">可用模型</div>
+                </div>
+                <button class="btn btn-sm btn-secondary" id="btnTestModels" data-i18n="dashboard.test_models">测试模型</button>
+              </div>
+              <div class="model-list" id="modelList">
+                <div class="loading-spinner"><div class="spinner"></div></div>
+              </div>
+            </div>
+            <div class="card card-compact">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" data-i18n="dashboard.service_title">服务状态</div>
+                </div>
+              </div>
+              <div class="info-list" id="serviceInfo">
+                <div class="loading-spinner"><div class="spinner"></div></div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- ======== 账号管理页 ======== -->
+      <div id="pageAccounts" class="page">
+        <div class="accounts-toolbar">
+          <div class="accounts-actions">
+            <button class="btn btn-primary" id="btnBrowserLogin">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                <polyline points="10 17 15 12 10 7"></polyline>
+                <line x1="15" y1="12" x2="3" y2="12"></line>
+              </svg>
+              <span data-i18n="accounts.browser_login">账号登录</span>
+            </button>
+            <button class="btn btn-secondary" id="btnImport">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <span data-i18n="accounts.import">导入账号</span>
+            </button>
+            <button class="btn btn-secondary" id="btnExport">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span data-i18n="accounts.export">导出账号</span>
+            </button>
+            <button class="btn btn-secondary" id="btnRefreshAccounts">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              <span data-i18n="accounts.refresh">刷新</span>
+            </button>
+            <button class="btn btn-warning" id="btnVerifyBatch">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+              </svg>
+              <span data-i18n="accounts.verify_batch">批量验证失效账号</span>
+            </button>
+            <button class="btn btn-info" id="btnCheckBatch">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span data-i18n="accounts.check_batch">批量检测封禁</span>
+            </button>
+            <button class="btn btn-primary" id="btnTestBatch">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              <span data-i18n="accounts.test_batch">批量测试</span>
+            </button>
+          </div>
+          <div class="accounts-right">
+            <div class="filter-bar" id="filterBar">
+              <button class="filter-btn active" data-filter="all" data-i18n="accounts.filter_all">全部</button>
+              <button class="filter-btn" data-filter="active" data-i18n="accounts.filter_active">活跃</button>
+              <button class="filter-btn" data-filter="cooldown" data-i18n="accounts.filter_cooldown">冷却</button>
+              <button class="filter-btn" data-filter="banned" data-i18n="accounts.filter_banned">封禁</button>
+              <button class="filter-btn" data-filter="expired" data-i18n="accounts.filter_expired">过期</button>
+              <button class="filter-btn" data-filter="wasted" data-i18n="accounts.filter_wasted">废弃</button>
+            </div>
+            <input class="input accounts-search" id="accountSearch" type="text" data-i18n-placeholder="accounts.search_placeholder">
+          </div>
+        </div>
+
+        <details class="dashboard-details gpa-interop-details" id="gpaInteropDetails">
+          <summary class="dashboard-details-summary">
+            <span data-i18n="accounts.gpa_title">凭证导入/导出</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </summary>
+          <div class="card gpa-interop-card">
+            <div class="card-header">
+              <div>
+                <div class="card-title" data-i18n="accounts.gpa_title">凭证导入/导出</div>
+                <div class="card-subtitle" data-i18n="accounts.gpa_desc">导入 GPA Codex 凭证，支持预览与导出</div>
+              </div>
+              <div class="gpa-interop-actions">
+                <button class="btn btn-secondary btn-sm" id="btnGpaPreview" data-i18n="accounts.gpa_preview">预览</button>
+                <button class="btn btn-primary btn-sm" id="btnGpaImport" data-i18n="accounts.gpa_import">导入</button>
+                <button class="btn btn-secondary btn-sm" id="btnGpaExport" data-i18n="accounts.gpa_export">导出 GPA 格式</button>
+              </div>
+            </div>
+            <div class="gpa-interop-grid">
+              <div class="gpa-interop-field">
+                <label class="login-label" for="gpaImportFileInput" data-i18n="accounts.gpa_file_label">上传 JSON 文件（可多选）</label>
+                <input id="gpaImportFileInput" class="input" type="file" accept=".json,application/json" multiple>
+                <p class="import-hint" id="gpaImportFileHint" data-i18n="accounts.gpa_file_hint">未选择文件时使用下方文本</p>
+              </div>
+              <div class="gpa-interop-field">
+                <label class="login-label" for="gpaImportTextarea" data-i18n="accounts.gpa_text_label">粘贴 JSON</label>
+                <textarea id="gpaImportTextarea" class="import-textarea" data-i18n-placeholder="accounts.gpa_text_placeholder"></textarea>
+              </div>
+            </div>
+            <div class="gpa-result-wrap">
+              <div class="card-subtitle" data-i18n="accounts.gpa_result_title">处理结果</div>
+              <pre id="gpaResultOutput" class="gpa-result-output">-</pre>
+            </div>
+          </div>
+        </details>
+
+        <div class="stats-summary-bar accounts-lifespan-summary" id="accountsLifespanSummary"></div>
+
+        <div class="table-wrapper">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="accounts.th_email">邮箱</th>
+                  <th data-i18n="accounts.th_status">状态</th>
+                  <th data-i18n="accounts.th_requests">请求数</th>
+                  <th data-i18n="accounts.th_token_expires">Token 过期</th>
+                  <th data-i18n="accounts.th_errors">连续错误</th>
+                  <th data-i18n="accounts.th_last_error">最近错误</th>
+                  <th data-i18n="accounts.th_actions">操作</th>
+                </tr>
+              </thead>
+              <tbody id="accountsBody">
+                <tr>
+                  <td colspan="7">
+                    <div class="loading-spinner"><div class="spinner"></div><span data-i18n="common.loading">加载中...</span></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="accountsPagination" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <!-- ======== 配置页 ======== -->
+      <div id="pageConfig" class="page">
+        <div id="configContent">
+          <div class="loading-spinner"><div class="spinner"></div><span data-i18n="common.loading">加载中...</span></div>
+        </div>
+      </div>
+
+      <!-- ======== 统计页 ======== -->
+      <div id="pageStatistics" class="page">
+        <!-- JS 动态填充 -->
+      </div>
+
+      <!-- ======== 日志页 ======== -->
+      <div id="pageLogs" class="page">
+        <div class="logs-toolbar">
+          <div id="logStats" class="log-stats">
+            <!-- JS 动态填充 -->
+          </div>
+          <div class="logs-controls">
+            <input class="input log-search" id="logSearchInput" type="text" data-i18n-placeholder="logs.search_placeholder">
+            <div class="logs-btns">
+              <button class="btn btn-secondary btn-sm" id="autoRefreshBtn" data-i18n="logs.auto_refresh">自动刷新</button>
+              <button class="btn btn-secondary btn-sm" id="manualRefreshBtn" data-i18n="logs.manual_refresh">刷新</button>
+              <button class="btn btn-danger btn-sm" id="clearLogsBtn" data-i18n="logs.clear">清空</button>
+            </div>
+          </div>
+        </div>
+        <div class="log-container">
+          <div id="logList" class="log-list">
+            <div class="loading-spinner"><div class="spinner"></div><span data-i18n="common.loading">加载中...</span></div>
+          </div>
+        </div>
+        <button id="loadMoreLogsBtn" class="btn btn-secondary load-more-btn" style="display: none;" data-i18n="logs.load_more">加载更多</button>
+      </div>
+
+      <!-- ======== 风控页 ======== -->
+      <div id="pageAbuse" class="page">
+        <div class="hero-stats" id="abuseOverviewCards"></div>
+
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div class="card-title" data-i18n="abuse.users_title">风险用户</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <select id="abuseLevelFilter" class="input" style="min-width:120px;">
+                <option value="" data-i18n="abuse.filter_all">全部等级</option>
+                <option value="low" data-i18n="abuse.level_low">低</option>
+                <option value="medium" data-i18n="abuse.level_medium">中</option>
+                <option value="high" data-i18n="abuse.level_high">高</option>
+                <option value="critical" data-i18n="abuse.level_critical">严重</option>
+              </select>
+              <select id="abuseSortSelect" class="input" style="min-width:140px;">
+                <option value="requests_desc" data-i18n="abuse.sort_requests_desc">请求数降序</option>
+                <option value="last_seen_desc" data-i18n="abuse.sort_last_seen_desc">最近活跃</option>
+                <option value="created_desc" data-i18n="abuse.sort_created_desc">最近注册</option>
+                <option value="score_desc" data-i18n="abuse.sort_score_desc">分数降序</option>
+                <option value="score_asc" data-i18n="abuse.sort_score_asc">分数升序</option>
+                <option value="updated_desc" data-i18n="abuse.sort_updated_desc">最近评估</option>
+              </select>
+              <input id="abuseSearchInput" class="input" type="text" data-i18n-placeholder="abuse.search_placeholder" style="min-width:220px;">
+              <button class="btn btn-secondary btn-sm" id="abuseRefreshUsersBtn" data-i18n="abuse.refresh">刷新</button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="abuse.col_seq_id">序号</th>
+                    <th data-i18n="abuse.col_avatar">头像</th>
+                    <th data-i18n="abuse.col_username">用户名</th>
+                    <th data-i18n="abuse.col_requests">请求数</th>
+                    <th data-i18n="abuse.col_input_tokens">输入Token</th>
+                    <th data-i18n="abuse.col_output_tokens">输出Token</th>
+                    <th data-i18n="abuse.col_cached_tokens">缓存Token</th>
+                    <th data-i18n="abuse.col_last_active">最后活跃</th>
+                    <th data-i18n="abuse.th_score">风险分</th>
+                    <th data-i18n="abuse.th_actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="abuseUsersBody">
+                  <tr><td colspan="10"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div class="card-title" data-i18n="abuse.events_title">风险事件流</div>
+            <button class="btn btn-secondary btn-sm" id="abuseRefreshEventsBtn" data-i18n="abuse.refresh">刷新</button>
+          </div>
+          <div class="log-container">
+            <div id="abuseEventsList" class="log-list">
+              <div class="loading-spinner"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div class="card-title" data-i18n="abuse.rules_title">规则配置</div>
+            <button class="btn btn-primary btn-sm" id="abuseSaveRulesBtn" data-i18n="abuse.save_rules">保存规则</button>
+          </div>
+          <textarea id="abuseRulesEditor" class="import-textarea" style="min-height:260px;" spellcheck="false"></textarea>
+        </div>
+      </div>
+
+      <!-- ======== 注册页 ======== -->
+      <div id="pageRegistration" class="page">
+        <!-- 服务器状态 -->
+        <div class="reg-status-bar" id="regStatusBar">
+          <div class="reg-status-indicator" id="regStatusDot"></div>
+          <span id="regStatusText" data-i18n="registration.checking">检查连接...</span>
+        </div>
+
+        <!-- 控制栏 -->
+        <div class="reg-control-bar">
+          <div class="reg-field">
+            <label data-i18n="registration.count">数量</label>
+            <input id="regCount" class="input reg-input" type="number" min="1" max="200" value="20">
+          </div>
+          <div class="reg-field">
+            <label data-i18n="registration.concurrency">并发</label>
+            <select id="regConcurrency" class="input reg-select">
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="15">15</option>
+              <option value="20" selected>20</option>
+              <option value="25">25</option>
+              <option value="30">30</option>
+              <option value="40">40</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <div class="reg-field reg-toggle-field">
+            <label data-i18n="registration.proxy">代理</label>
+            <label class="toggle-switch">
+              <input id="regProxy" type="checkbox" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="reg-field reg-toggle-field">
+            <label data-i18n="registration.auto_upload">自动上传</label>
+            <label class="toggle-switch">
+              <input id="regAutoUpload" type="checkbox" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <button class="btn btn-primary" id="regStartBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span data-i18n="registration.start">开始注册</span>
+          </button>
+          <button class="btn btn-danger" id="regStopBtn" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
+            <span data-i18n="registration.stop">停止</span>
+          </button>
+        </div>
+
+        <!-- 进度区 -->
+        <div class="reg-progress" id="regProgress" style="display:none;">
+          <div class="reg-progress-header">
+            <span data-i18n="registration.progress">注册进度</span>
+            <span id="regElapsed" class="reg-elapsed"></span>
+          </div>
+          <div class="reg-progress-bar-wrap">
+            <div class="reg-progress-bar" id="regProgressBar" style="width:0%"></div>
+          </div>
+          <div class="reg-progress-text" id="regProgressText">0 / 0</div>
+          <div class="reg-stats-grid">
+            <div class="reg-stat-card reg-stat-success">
+              <div class="reg-stat-value" id="regSuccessCount">0</div>
+              <div class="reg-stat-label" data-i18n="registration.success">成功</div>
+            </div>
+            <div class="reg-stat-card reg-stat-failed">
+              <div class="reg-stat-value" id="regFailedCount">0</div>
+              <div class="reg-stat-label" data-i18n="registration.failed">失败</div>
+            </div>
+            <div class="reg-stat-card reg-stat-uncertain">
+              <div class="reg-stat-value" id="regUncertainCount">0</div>
+              <div class="reg-stat-label" data-i18n="registration.uncertain">不确定</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 注册成功率监控 -->
+        <div class="card" id="regMonitorCard" style="margin-top: 16px; display: none;">
+          <div class="card-header">
+            <div class="card-title" data-i18n="registration.monitor_title">注册成功率监控</div>
+          </div>
+          <div class="reg-monitor" id="regMonitor">
+            <div class="empty-state"><span data-i18n="registration.no_stats">暂无统计数据</span></div>
+          </div>
+        </div>
+
+        <!-- 历史任务 -->
+        <details class="reg-history-details" id="regHistoryDetails">
+          <summary class="reg-history-summary">
+            <span data-i18n="registration.history_title">历史任务</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="table-wrapper">
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="registration.history_job_id">任务 ID</th>
+                    <th data-i18n="registration.history_time">时间</th>
+                    <th data-i18n="registration.history_count">数量</th>
+                    <th data-i18n="registration.history_result">结果</th>
+                    <th data-i18n="registration.history_elapsed">用时</th>
+                    <th data-i18n="registration.history_detail">步骤统计</th>
+                  </tr>
+                </thead>
+                <tbody id="regHistoryBody">
+                  <tr><td colspan="6"><div class="empty-state"><span data-i18n="registration.history_empty">暂无历史记录</span></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+
+        <!-- 注册机账号统计 -->
+        <div class="card" style="margin-top: 16px;">
+          <div class="card-header">
+            <div class="card-title" data-i18n="registration.remote_accounts">注册机账号</div>
+            <button class="btn btn-secondary btn-sm" id="regRefreshAccounts">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span data-i18n="accounts.refresh">刷新</span>
+            </button>
+          </div>
+          <div class="reg-remote-stats" id="regRemoteStats">
+            <div class="loading-spinner"><div class="spinner"></div></div>
+          </div>
+          <div class="table-wrapper" style="margin-top: 8px;">
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="accounts.th_email">邮箱</th>
+                    <th data-i18n="accounts.th_status">状态</th>
+                    <th>Token</th>
+                    <th data-i18n="registration.registered_at">注册时间</th>
+                  </tr>
+                </thead>
+                <tbody id="regAccountsBody">
+                  <tr><td colspan="4"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="reg-pagination" id="regPagination"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ============ 导入弹窗 ============ -->
+<div id="importModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" data-i18n="accounts.import_title">导入账号</h3>
+      <button class="modal-close" id="importModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="login-label" data-i18n="accounts.import_paste_label">粘贴 JSON 数据</label>
+      <textarea id="importTextarea" class="import-textarea" data-i18n-placeholder="accounts.import_placeholder"></textarea>
+      <p class="import-hint" data-i18n="accounts.import_hint">支持单个对象或数组格式</p>
+      <div class="file-upload-area" id="fileUploadArea">
+        <p data-i18n="accounts.import_file_hint">或点击此处 / 拖拽上传 JSON 文件</p>
+        <input type="file" id="fileUploadInput" accept=".json">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="importCancelBtn" data-i18n="accounts.import_cancel">取消</button>
+      <button class="btn btn-primary" id="importConfirmBtn" data-i18n="accounts.import_confirm">确认导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 账号登录弹窗 ============ -->
+<div id="browserLoginModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" data-i18n="accounts.browser_login_title">账号登录添加</h3>
+      <button class="modal-close" id="browserLoginModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="import-hint" data-i18n="accounts.browser_login_desc">输入 ChatGPT 邮箱和密码，服务端自动登录并提取凭证</p>
+      <div class="login-field" style="margin-top: 12px;">
+        <label class="login-label" for="browserLoginEmail" data-i18n="accounts.browser_login_email">邮箱</label>
+        <input id="browserLoginEmail" class="input" type="email" data-i18n-placeholder="accounts.browser_login_email_placeholder" autocomplete="off">
+      </div>
+      <div class="login-field" style="margin-top: 12px;">
+        <label class="login-label" for="browserLoginPassword" data-i18n="accounts.browser_login_password">密码</label>
+        <input id="browserLoginPassword" class="input" type="password" data-i18n-placeholder="accounts.browser_login_password_placeholder" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="browserLoginCancelBtn" data-i18n="accounts.import_cancel">取消</button>
+      <button class="btn btn-primary" id="browserLoginSubmitBtn" data-i18n="accounts.browser_login_submit">登录并提取凭证</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 风控详情弹窗 ============ -->
+<div id="abuseDetailModal" class="modal-overlay">
+  <div class="modal" style="max-width:900px;">
+    <div class="modal-header">
+      <h3 class="modal-title" data-i18n="abuse.detail_title">风险详情</h3>
+      <button class="modal-close" id="abuseDetailModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="stats-summary-bar" id="abuseDetailSummary"></div>
+      <div class="card" style="margin-top:12px;">
+        <div class="card-header">
+          <div class="card-title" data-i18n="abuse.detail_rules">命中规则</div>
+        </div>
+        <div id="abuseDetailRules"></div>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <div class="card-header">
+          <div class="card-title" data-i18n="abuse.detail_timeline">事件时间线</div>
+        </div>
+        <div class="log-container" style="max-height:260px;">
+          <div id="abuseDetailTimeline" class="log-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" data-abuse-action="observe" data-i18n="abuse.action_observe">观察</button>
+        <button class="btn btn-warning btn-sm" data-abuse-action="throttle" data-i18n="abuse.action_throttle">限速</button>
+        <button class="btn btn-danger btn-sm" data-abuse-action="challenge" data-i18n="abuse.action_challenge">挑战</button>
+        <button class="btn btn-danger btn-sm" data-abuse-action="suspend" data-i18n="abuse.action_suspend">封禁</button>
+        <button class="btn btn-secondary btn-sm" data-abuse-action="restore" data-i18n="abuse.action_restore">恢复</button>
+      </div>
+      <button class="btn btn-secondary" id="abuseDetailModalCancel" data-i18n="common.close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Toast 容器 ============ -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- JS 按依赖顺序加载 -->
+<script src="/admin/js/utils.js" defer></script>
+<script src="/admin/js/ui.js" defer></script>
+<script src="/admin/js/auth.js" defer></script>
+<script src="/admin/js/date-picker.js" defer></script>
+<script src="/admin/js/dashboard.js" defer></script>
+<script src="/admin/js/accounts.js" defer></script>
+<script src="/admin/js/config.js" defer></script>
+<script src="/admin/js/statistics.js" defer></script>
+<script src="/admin/js/logs.js" defer></script>
+<script src="/admin/js/registration.js" defer></script>
+<script src="/admin/js/abuse.js" defer></script>
+<script src="/admin/js/main.js" defer></script>
+</body>
+</html>

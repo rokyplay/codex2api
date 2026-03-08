@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://cdn.discordapp.com https:; connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>codex2api · 用户登录</title>
+  <link rel="icon" href="/user/assets/favicon.webp" type="image/webp">
+  <link rel="icon" href="/user/assets/favicon.jpg" type="image/jpeg">
+  <link rel="stylesheet" href="/style.css">
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('codex2api_theme');
+        if (saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <style>
+    :root {
+      --bg-primary: var(--color-bg);
+      --bg-secondary: var(--color-bg-secondary);
+      --surface: var(--color-surface);
+      --surface-muted: var(--color-surface-hover);
+      --border: var(--color-border);
+      --text-primary: var(--color-text-primary);
+      --text-secondary: var(--color-text-secondary);
+      --text-muted: var(--color-text-muted);
+      --accent: var(--color-accent);
+      --accent-hover: var(--color-accent-hover);
+      --success: var(--color-success);
+      --danger: var(--color-danger);
+      --danger-soft: var(--color-danger-bg);
+      --warning-soft: var(--color-warning-bg);
+      --shadow: var(--shadow-lg);
+      --radius: var(--radius-lg);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      font-family: var(--font-family);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.55;
+    }
+
+    .theme-toolbar {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 20;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+
+    .theme-toggle:hover {
+      background: var(--surface-muted);
+      border-color: var(--color-border-hover);
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      width: min(100%, 640px);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 18px;
+      flex: 0 0 auto;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    .brand-sub {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .notice {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--warning-soft);
+      color: var(--color-warning);
+      font-size: 13px;
+    }
+
+    .panel-title {
+      margin: 18px 0 10px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      letter-spacing: 0.02em;
+    }
+
+    .turnstile-box {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 12px;
+      min-height: 86px;
+    }
+
+    .status-text {
+      min-height: 18px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .status-text.ok {
+      color: var(--success);
+    }
+
+    .status-text.error {
+      color: var(--danger);
+    }
+
+    .terms-panel {
+      margin-top: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+
+    .terms-panel.terms-hidden {
+      display: none;
+    }
+
+    .terms-hint {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: var(--color-warning);
+    }
+
+    .terms-hint.ok {
+      color: var(--success);
+    }
+
+    .terms-scroll-box {
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--bg-primary);
+    }
+
+    .terms-content h3,
+    .terms-content h4 {
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .terms-content h3 {
+      font-size: 15px;
+    }
+
+    .terms-content h4 {
+      margin-top: 14px;
+      font-size: 14px;
+    }
+
+    .terms-content p,
+    .terms-content ol,
+    .terms-content li {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    .terms-content ol {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+
+    .terms-content li + li {
+      margin-top: 6px;
+    }
+
+    .terms-emphasis {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .terms-agree-row {
+      margin-top: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    .terms-agree-row input {
+      margin-top: 3px;
+      accent-color: var(--accent);
+    }
+
+    .terms-review {
+      margin: 10px 0 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .terms-review.terms-hidden {
+      display: none;
+    }
+
+    .small-link {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .small-link:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+
+    .login-btn {
+      width: 100%;
+      margin-top: 14px;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .login-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .login-btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .footer-note,
+    .consent-note {
+      margin: 10px 0 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .site-footer {
+      margin: 14px 0 0;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        padding: 12px;
+      }
+
+      .card {
+        padding: 16px;
+      }
+
+      .brand-title {
+        font-size: 20px;
+      }
+
+      .terms-scroll-box {
+        max-height: 240px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="theme-toolbar">
+    <button id="themeToggleBtn" class="theme-toggle" type="button" aria-label="切换主题">浅色模式</button>
+  </div>
+  <main class="page">
+    <section class="card" aria-label="登录卡片">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">C</div>
+        <div>
+          <h1 class="brand-title">codex2api 公益站</h1>
+          <p class="brand-sub">Discord 身份认证入口</p>
+        </div>
+      </div>
+
+      <div class="notice"><strong>本服务仅供学习交流，严禁商业用途。</strong></div>
+      <div class="notice">服务不保证稳定与连续，可能随时中断或终止，相关风险由用户自行承担。</div>
+      <div class="notice">完整条款请查看 <a id="viewTermsInlineTop" class="small-link" href="#termsPanel">隐私条款与免责声明</a>。</div>
+
+      <p class="panel-title">安全验证</p>
+      <div class="turnstile-box">
+        <div
+          class="cf-turnstile"
+          data-sitekey="0x4AAAAAACm0uCrRtknJTlv7"
+          data-callback="onTurnstileSuccess"
+          data-expired-callback="onTurnstileExpired"
+          data-error-callback="onTurnstileError"></div>
+      </div>
+      <div id="statusText" class="status-text">请先完成人机验证。</div>
+
+      <div id="termsPanel" class="terms-panel" aria-label="隐私条款与免责声明">
+        <p class="panel-title" style="margin-top:0;">隐私条款与免责声明（完整）</p>
+        <p id="termsHint" class="terms-hint">请先阅读完条款再勾选同意</p>
+        <div id="termsScrollBox" class="terms-scroll-box" tabindex="0">
+          <article class="terms-content">
+            <h3>隐私条款与免责声明</h3>
+            <p>生效日期：2026-03-05</p>
+
+            <h4>一、隐私条款</h4>
+            <ol>
+              <li>为完成身份验证与访问控制，我们会收集并处理第三方 OAuth 账号的基本信息，包括但不限于：用户名、账号 ID、头像信息。</li>
+              <li class="terms-emphasis">为保障服务安全与合规运行，我们会记录全部 API 请求的运行元数据，包括但不限于：请求时间、所用模型、Token 数量等。</li>
+              <li>我们不收集、不存储、不审核用户的对话内容（prompt 和 response）。我们仅收集行为元数据（请求时间、频率、Token 用量、IP 哈希、错误率等）用于自动化风险识别与滥用检测。行为数据保留 2 天后自动清理。</li>
+              <li class="terms-emphasis">上述数据存储于我们控制的云服务器环境中，并采取合理的安全措施进行保护。</li>
+              <li class="terms-emphasis">请求数据主要用于 AI 自动化检测与风控流程，不进行人工逐条审阅；但在出现安全事件、合规要求或系统故障排查时，可能进行必要范围内的审计访问。</li>
+              <li>我们不会将您的数据出售给任何第三方，也不会向第三方提供可识别个人身份的数据，法律法规另有要求的除外。</li>
+              <li>您一旦使用本服务，即视为已阅读、理解并同意本隐私条款的全部内容。</li>
+            </ol>
+
+            <h4>二、免责声明</h4>
+            <ol>
+              <li>本服务仅供学习与研究用途，严禁用于任何商业化目的。</li>
+              <li>我们不对服务的可用性、稳定性、连续性作任何明示或默示保证，服务可能在任何时间中断、调整或终止。</li>
+              <li>用户应对自身使用行为承担全部法律责任，包括但不限于由输入、输出、分发、二次开发所引发的风险与后果。</li>
+              <li>严禁将本服务用于违法违规活动，包括但不限于暴力、赌博、诈骗、侵权、恶意攻击等行为。</li>
+              <li>严禁将本服务接入商业化软件、商业化平台或以营利为目的的系统；仅允许个人在开源软件场景下进行非商业使用。</li>
+              <li>因使用或无法使用本服务所导致的任何直接、间接、附带、特殊或后果性损失，服务提供方不承担责任。</li>
+              <li>对违反本条款、滥用服务或存在安全风险的账号，我们有权不经通知立即限制或终止其访问权限。</li>
+              <li>我们保留随时更新、修改本条款内容的权利；更新后的条款一经发布即生效。</li>
+              <li>用户应遵守其所在地适用的法律法规与监管要求；若用户行为与法律法规冲突，由用户自行承担全部责任。</li>
+            </ol>
+
+            <h4>三、条款接受</h4>
+            <p>继续使用本服务即表示您已充分阅读并同意本隐私条款与免责声明。若您不同意本条款，请立即停止使用本服务。</p>
+          </article>
+        </div>
+        <label class="terms-agree-row" for="termsAgreeCheckbox">
+          <input id="termsAgreeCheckbox" type="checkbox" disabled>
+          <span>我已阅读并同意上述条款</span>
+        </label>
+      </div>
+
+      <p id="termsReview" class="terms-review terms-hidden">已记录同意状态，可随时<a id="viewTermsInlineLink" class="small-link" href="#termsPanel">查看条款</a>。</p>
+      <button id="discordLoginBtn" class="login-btn" type="button" disabled>使用 Discord 登录</button>
+
+      <p class="footer-note">登录账号需要在指定 Discord 服务器中具备允许的身份组，如遇问题可联系管理员核查权限。</p>
+      <p class="consent-note">使用本服务即表示您同意平台条款，可随时<a id="viewTermsInlineFooter" class="small-link" href="#termsPanel">查看条款</a>。</p>
+      <p class="site-footer">by Rok & Nan · 出于热爱与好奇而构建 ✨</p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('themeToggleBtn');
+      if (!btn) return;
+
+      function syncLabel() {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        btn.textContent = isDark ? '深色模式' : '浅色模式';
+      }
+
+      btn.addEventListener('click', function () {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        if (isDark) {
+          document.documentElement.removeAttribute('data-theme');
+          try { localStorage.setItem('codex2api_theme', 'light'); } catch (_) {}
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          try { localStorage.setItem('codex2api_theme', 'dark'); } catch (_) {}
+        }
+        syncLabel();
+      });
+
+      syncLabel();
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var TERMS_STORAGE_KEY = 'codex2api_public_terms_accepted_v1';
+
+      function safeGetStorage(key) {
+        try {
+          return localStorage.getItem(key);
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function safeSetStorage(key, value) {
+        try {
+          localStorage.setItem(key, value);
+        } catch (_) {}
+      }
+
+      function safeRemoveStorage(key) {
+        try {
+          localStorage.removeItem(key);
+        } catch (_) {}
+      }
+
+      var rememberedTermsAccepted = safeGetStorage(TERMS_STORAGE_KEY) === '1';
+      var state = {
+        turnstileVerified: false,
+        verifying: false,
+        termsReadToEnd: rememberedTermsAccepted,
+        termsAccepted: rememberedTermsAccepted,
+        termsPanelForcedOpen: false
+      };
+
+      var statusEl = document.getElementById('statusText');
+      var loginBtn = document.getElementById('discordLoginBtn');
+      var termsPanel = document.getElementById('termsPanel');
+      var termsHintEl = document.getElementById('termsHint');
+      var termsScrollBox = document.getElementById('termsScrollBox');
+      var termsAgreeCheckbox = document.getElementById('termsAgreeCheckbox');
+      var termsReviewEl = document.getElementById('termsReview');
+      var termsOpenTop = document.getElementById('viewTermsInlineTop');
+      var termsOpenMain = document.getElementById('viewTermsInlineLink');
+      var termsOpenFooter = document.getElementById('viewTermsInlineFooter');
+
+      function setStatus(text, kind) {
+        statusEl.textContent = text;
+        statusEl.classList.remove('ok', 'error');
+        if (kind) statusEl.classList.add(kind);
+      }
+
+      function setTermsHint(text, kind) {
+        termsHintEl.textContent = text;
+        termsHintEl.classList.remove('ok');
+        if (kind === 'ok') termsHintEl.classList.add('ok');
+      }
+
+      function hasReadToBottom() {
+        return termsScrollBox.scrollTop + termsScrollBox.clientHeight >= termsScrollBox.scrollHeight - 50;
+      }
+
+      function persistTermsAccepted(isAccepted) {
+        if (isAccepted) safeSetStorage(TERMS_STORAGE_KEY, '1');
+        else safeRemoveStorage(TERMS_STORAGE_KEY);
+      }
+
+      function updateTermsUI() {
+        var showPanel = state.termsPanelForcedOpen || !state.termsAccepted;
+        termsPanel.classList.toggle('terms-hidden', !showPanel);
+        termsReviewEl.classList.toggle('terms-hidden', !state.termsAccepted);
+
+        termsAgreeCheckbox.checked = state.termsAccepted;
+        if (state.termsAccepted || state.termsReadToEnd) {
+          termsAgreeCheckbox.disabled = false;
+          if (state.termsAccepted) setTermsHint('已同意条款，可继续登录。', 'ok');
+          else setTermsHint('已阅读到底部，请勾选同意后继续。', 'ok');
+        } else {
+          termsAgreeCheckbox.disabled = true;
+          termsAgreeCheckbox.checked = false;
+          setTermsHint('请先阅读完条款再勾选同意', '');
+        }
+      }
+
+      function maybeUnlockTermsCheckbox() {
+        if (state.termsReadToEnd || state.termsAccepted) return;
+        if (!hasReadToBottom()) return;
+        state.termsReadToEnd = true;
+        updateTermsUI();
+        refreshLoginButton();
+      }
+
+      function openTermsPanel(event) {
+        if (event) event.preventDefault();
+        state.termsPanelForcedOpen = true;
+        updateTermsUI();
+        termsScrollBox.focus();
+      }
+
+      function refreshLoginButton() {
+        loginBtn.disabled = state.verifying || !state.turnstileVerified || !state.termsAccepted;
+      }
+
+      async function verifyTurnstileToken(token) {
+        state.verifying = true;
+        state.turnstileVerified = false;
+        refreshLoginButton();
+        setStatus('正在校验验证结果，请稍候...', '');
+
+        try {
+          var resp = await fetch('/auth/turnstile/verify', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token })
+          });
+
+          var payload = null;
+          try {
+            payload = await resp.json();
+          } catch (_) {
+            payload = null;
+          }
+
+          if (!resp.ok || !payload || payload.success !== true) {
+            var detail = payload && payload.error ? payload.error : 'verify_failed';
+            throw new Error(detail);
+          }
+
+          state.turnstileVerified = true;
+          setStatus('验证通过，可以继续 Discord 登录。', 'ok');
+        } catch (err) {
+          state.turnstileVerified = false;
+          setStatus('验证失败，请重试。错误：' + (err && err.message ? err.message : 'unknown'), 'error');
+          if (window.turnstile && typeof window.turnstile.reset === 'function') {
+            try {
+              window.turnstile.reset();
+            } catch (_) {}
+          }
+        } finally {
+          state.verifying = false;
+          refreshLoginButton();
+        }
+      }
+
+      window.onTurnstileSuccess = function (token) {
+        if (!token) {
+          state.turnstileVerified = false;
+          refreshLoginButton();
+          setStatus('未拿到验证令牌，请重试。', 'error');
+          return;
+        }
+        verifyTurnstileToken(token);
+      };
+
+      window.onTurnstileExpired = function () {
+        state.turnstileVerified = false;
+        refreshLoginButton();
+        setStatus('验证已过期，请重新验证。', 'error');
+      };
+
+      window.onTurnstileError = function () {
+        state.turnstileVerified = false;
+        refreshLoginButton();
+        setStatus('验证组件异常，请刷新页面后重试。', 'error');
+      };
+
+      termsScrollBox.addEventListener('scroll', maybeUnlockTermsCheckbox);
+
+      termsAgreeCheckbox.addEventListener('change', function () {
+        if (termsAgreeCheckbox.checked && !state.termsReadToEnd && !state.termsAccepted) {
+          termsAgreeCheckbox.checked = false;
+          setTermsHint('请先阅读完条款再勾选同意', '');
+          refreshLoginButton();
+          return;
+        }
+
+        state.termsAccepted = !!termsAgreeCheckbox.checked;
+        if (state.termsAccepted) {
+          state.termsReadToEnd = true;
+          state.termsPanelForcedOpen = false;
+        } else {
+          state.termsPanelForcedOpen = true;
+        }
+
+        persistTermsAccepted(state.termsAccepted);
+        updateTermsUI();
+        refreshLoginButton();
+      });
+
+      termsOpenTop.addEventListener('click', openTermsPanel);
+      termsOpenMain.addEventListener('click', openTermsPanel);
+      termsOpenFooter.addEventListener('click', openTermsPanel);
+
+      loginBtn.addEventListener('click', function () {
+        if (!state.turnstileVerified || state.verifying || !state.termsAccepted) return;
+        window.location.href = '/auth/discord';
+      });
+
+      async function checkExistingSession() {
+        try {
+          var resp = await fetch('/auth/profile', {
+            method: 'GET',
+            credentials: 'same-origin'
+          });
+          var payload = null;
+          try {
+            payload = await resp.json();
+          } catch (_) {
+            payload = null;
+          }
+          if (resp.ok && payload && payload.success === true) {
+            window.location.replace('/portal/');
+          }
+        } catch (_) {}
+      }
+
+      checkExistingSession();
+      updateTermsUI();
+      window.setTimeout(maybeUnlockTermsCheckbox, 0);
+      refreshLoginButton();
+    })();
+  </script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</body>
+</html>

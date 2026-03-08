@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://cdn.discordapp.com https:; media-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>codex2api · 隐私条款与免责声明</title>
+  <style>
+    :root {
+      --bg-1: #090c16;
+      --bg-2: #10172b;
+      --bg-3: #1a2142;
+      --panel: rgba(14, 20, 37, 0.9);
+      --panel-border: rgba(149, 166, 210, 0.24);
+      --text-main: #edf2ff;
+      --text-sub: #a2b1d8;
+      --accent: #6f7cff;
+      --accent-2: #52d5ff;
+      --line: rgba(145, 161, 206, 0.2);
+      --shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--text-main);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(111, 124, 255, 0.28), transparent 44%),
+        radial-gradient(circle at 92% 100%, rgba(82, 213, 255, 0.2), transparent 38%),
+        linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 46%, var(--bg-3) 100%);
+      background-attachment: fixed;
+    }
+
+    .page {
+      width: min(920px, calc(100% - 28px));
+      margin: 22px auto 28px;
+      animation: riseIn 0.42s ease;
+    }
+
+    .top-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(151, 167, 255, 0.32);
+      border-radius: 999px;
+      padding: 8px 14px;
+      color: #dce7ff;
+      text-decoration: none;
+      background: rgba(111, 124, 255, 0.15);
+      font-size: 13px;
+      transition: all 0.2s ease;
+    }
+
+    .top-link:hover {
+      transform: translateY(-1px);
+      background: rgba(111, 124, 255, 0.28);
+    }
+
+    .card {
+      margin-top: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--panel-border);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      padding: 28px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0.01em;
+    }
+
+    .meta {
+      margin-top: 8px;
+      color: var(--text-sub);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--line);
+      margin: 18px 0;
+    }
+
+    h2 {
+      margin: 20px 0 10px;
+      font-size: 19px;
+      color: #d6e0ff;
+    }
+
+    ol {
+      margin: 0;
+      padding-left: 20px;
+      color: #d9e3ff;
+    }
+
+    li {
+      line-height: 1.75;
+      margin-bottom: 8px;
+      color: #cfdaf9;
+    }
+
+    .accept {
+      margin-top: 8px;
+      padding: 13px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(111, 124, 255, 0.32);
+      background: rgba(111, 124, 255, 0.12);
+      color: #dbe5ff;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .site-footer {
+      margin-top: 18px;
+      color: #95a5cf;
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    @keyframes riseIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        width: calc(100% - 16px);
+        margin: 12px auto 18px;
+      }
+
+      .card {
+        padding: 20px 16px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page" aria-label="隐私条款与免责声明页面">
+    <a class="top-link" href="/login" aria-label="返回登录">← 返回登录</a>
+
+    <section class="card">
+      <h1>隐私条款与免责声明</h1>
+      <p class="meta">生效日期：2026-03-05</p>
+
+      <hr>
+
+      <h2>一、隐私条款</h2>
+      <ol>
+        <li>为完成身份验证与访问控制，我们会收集并处理第三方 OAuth 账号的基本信息，包括但不限于：用户名、账号 ID、头像信息。</li>
+        <li>为保障服务安全与合规运行，我们会记录全部 API 请求的运行元数据，包括但不限于：请求时间、所用模型、Token 数量等。</li>
+        <li>为进行自动化风险识别与滥用检测，我们会保留请求内容摘要，摘要规则为：请求文本前 500 字符、中间 500 字符、后 500 字符。</li>
+        <li>上述数据存储于我们控制的云服务器环境中，并采取合理的安全措施进行保护。</li>
+        <li>请求数据主要用于 AI 自动化检测与风控流程，不进行人工逐条审阅；但在出现安全事件、合规要求或系统故障排查时，可能进行必要范围内的审计访问。</li>
+        <li>我们不会将您的数据出售给任何第三方，也不会向第三方提供可识别个人身份的数据，法律法规另有要求的除外。</li>
+        <li>您一旦使用本服务，即视为已阅读、理解并同意本隐私条款的全部内容。</li>
+      </ol>
+
+      <h2>二、免责声明</h2>
+      <ol>
+        <li>本服务仅供学习与研究用途，严禁用于任何商业化目的。</li>
+        <li>我们不对服务的可用性、稳定性、连续性作任何明示或默示保证，服务可能在任何时间中断、调整或终止。</li>
+        <li>用户应对自身使用行为承担全部法律责任，包括但不限于由输入、输出、分发、二次开发所引发的风险与后果。</li>
+        <li>严禁将本服务用于违法违规活动，包括但不限于色情、暴力、赌博、诈骗、侵权、恶意攻击等行为。</li>
+        <li>严禁将本服务接入商业化软件、商业化平台或以营利为目的的系统；仅允许个人在开源软件场景下进行非商业使用。</li>
+        <li>因使用或无法使用本服务所导致的任何直接、间接、附带、特殊或后果性损失，服务提供方不承担责任。</li>
+        <li>对违反本条款、滥用服务或存在安全风险的账号，我们有权不经通知立即限制或终止其访问权限。</li>
+        <li>我们保留随时更新、修改本条款内容的权利；更新后的条款一经发布即生效。</li>
+        <li>用户应遵守其所在地适用的法律法规与监管要求；若用户行为与法律法规冲突，由用户自行承担全部责任。</li>
+      </ol>
+
+      <h2>三、条款接受</h2>
+      <div class="accept">继续使用本服务即表示您已充分阅读并同意本隐私条款与免责声明。若您不同意本条款，请立即停止使用本服务。</div>
+
+      <p class="site-footer">© 2026 Codex API · by Rok & Nan · 出于热爱与好奇而构建 ✨</p>
+    </section>
+  </main>
+</body>
+</html>

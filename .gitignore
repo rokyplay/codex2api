@@ -1,0 +1,9 @@
+node_modules/
+data/
+tmp/
+*.log
+*.pid
+*.bak*
+.env
+config-server.json
+config.json
